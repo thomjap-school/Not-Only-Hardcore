@@ -10,6 +10,10 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.Date;
 
@@ -67,5 +71,35 @@ public class DeathBan extends JavaPlugin implements Listener {
                 player.kickPlayer(banMessage);
             }
         });
+    }
+
+    @EventHandler
+    public void onPvpDamage(EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof Player)) return;
+        if (!(event.getDamager() instanceof Player)) return;
+
+        Player victim = (Player) event.getEntity();
+
+        if (isInventoryEmpty(victim)) {
+            event.setCancelled(true);
+        }
+    }
+
+    private boolean isInventoryEmpty(Player player) {
+        PlayerInventory inv = player.getInventory();
+
+        for (ItemStack item : inv.getContents()) {
+            if (item != null && item.getType() != Material.AIR) {
+                return false;
+            }
+        }
+
+        if (inv.getHelmet() != null) return false;
+        if (inv.getChestplate() != null) return false;
+        if (inv.getLeggings() != null) return false;
+        if (inv.getBoots() != null) return false;
+        if (inv.getItemInOffHand().getType() != Material.AIR) return false;
+
+        return true;
     }
 }
