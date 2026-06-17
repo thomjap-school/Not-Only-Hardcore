@@ -89,6 +89,7 @@ public class PrisonFeature implements Listener {
 
     private void savePrisoner(UUID uuid, PrisonData data) {
         String path = "prisoners." + uuid.toString() + ".";
+        dataConfig.set(path + "ign", Bukkit.getOfflinePlayer(uuid).getName());
         dataConfig.set(path + "releaseTime", data.releaseTimeMillis);
         dataConfig.set(path + "world", data.returnWorldName);
         dataConfig.set(path + "x", data.returnX);
