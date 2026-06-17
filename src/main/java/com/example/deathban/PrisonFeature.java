@@ -26,9 +26,9 @@ public class PrisonFeature implements Listener {
 
     private static final String PRISON_WORLD_NAME = "Jail";
 
-    private static final double PRISON_X = 0.0;
-    private static final double PRISON_Y = -40.0;
-    private static final double PRISON_Z = 0.0;
+    private static final double PRISON_X = -32;
+    private static final double PRISON_Y = 28;
+    private static final double PRISON_Z = -74;
     private static final float PRISON_YAW = 0.0f;
     private static final float PRISON_PITCH = 0.0f;
 
