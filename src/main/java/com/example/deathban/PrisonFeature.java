@@ -145,7 +145,7 @@ public class PrisonFeature implements Listener {
         player.sendMessage(ChatColor.RED + "Vous êtes emprisonné. Temps restant : " + remainingMinutes + "m " + remainingSeconds + "s");
     }
 
-    private void release(Player player) {
+    public void release(Player player) {
         UUID uuid = player.getUniqueId();
         if (prisoners.get(uuid) == null) return;
 

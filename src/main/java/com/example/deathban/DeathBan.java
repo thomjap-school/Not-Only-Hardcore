@@ -35,6 +35,7 @@ public class DeathBan extends JavaPlugin implements Listener {
 
         prisonFeature = new PrisonFeature(this);
         Bukkit.getPluginManager().registerEvents(prisonFeature, this);
+        getCommand("db").setExecutor(new PrisonCommand(prisonFeature));
 
         Bukkit.getPluginManager().registerEvents(
                 new DeathListener(this, prisonFeature, DEATH_SOUND, SOUND_VOLUME, SOUND_PITCH),
