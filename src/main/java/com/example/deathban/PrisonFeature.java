@@ -21,7 +21,7 @@ import java.util.UUID;
 
 public class PrisonFeature implements Listener {
 
-    private static final long PRISON_DURATION_MINUTES = 1;
+    private static final long PRISON_DURATION_MINUTES = (48*60);
 
     private static final String PRISON_WORLD_NAME = "Jail";
 
@@ -107,6 +107,7 @@ public class PrisonFeature implements Listener {
 
     public void imprison(Player player) {
         UUID uuid = player.getUniqueId();
+        if (prisoners.containsKey(uuid)) return;
         Location currentLocation = player.getLocation();
 
         long releaseTimeMillis = System.currentTimeMillis() + (PRISON_DURATION_MINUTES * 60 * 1000);
