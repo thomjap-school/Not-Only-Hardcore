@@ -14,6 +14,8 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import java.util.Date;
 
@@ -27,8 +29,6 @@ public class DeathBan extends JavaPlugin implements Listener {
     private static final long BAN_DURATION_HOURS = 48;
 
     // Son joué sur tout le serveur quand un joueur meurt.
-    // Remplace XXXXXXXXXXXXXXXXXXXXXX par le Sound correspondant
-    // (ex: Sound.ENTITY_WITHER_DEATH)
     private static final Sound DEATH_SOUND = Sound.ENTITY_WITHER_SPAWN;
 
     // Volume et hauteur du son (1.0F = normal)
@@ -40,31 +40,39 @@ public class DeathBan extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         Bukkit.getPluginManager().registerEvents(this, this);
+        Bukkit.getPluginManager().registerEvents(new HeadFeature(this), this);
         getLogger().info("DeathBan activé - durée de ban : " + BAN_DURATION_HOURS + "h");
     }
 
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
-
+    
+        // Récupère le message de mort vanilla (ex: "Steve a été tué par Zombie")
+        Component deathComponent = event.deathMessage();
+        String deathMessage = deathComponent != null
+                ? PlainTextComponentSerializer.plainText().serialize(deathComponent)
+                : "Cause inconnue";
+    
         // Calcul de la date d'expiration du ban
         long durationMillis = BAN_DURATION_HOURS * 60 * 60 * 1000;
         Date expiration = new Date(System.currentTimeMillis() + durationMillis);
-
+    
         // Message de ban affiché au joueur (en rouge)
         String banMessage = ChatColor.RED + "Vous êtes mort !\n"
+                + ChatColor.RED + "Cause : " + deathMessage + "\n"
                 + ChatColor.RED + "Vous êtes banni pour " + BAN_DURATION_HOURS + " heures.\n"
                 + ChatColor.RED + "Revenez plus tard.";
-
+    
         // Application du ban (par nom de joueur)
         BanList<org.bukkit.profile.PlayerProfile> banList = Bukkit.getBanList(BanList.Type.PROFILE);
         banList.addBan(player.getPlayerProfile(), banMessage, expiration, "DeathBan plugin");
-
+    
         // Joue le son de mort à tous les joueurs connectés
         for (Player online : Bukkit.getOnlinePlayers()) {
             online.playSound(online.getLocation(), DEATH_SOUND, SOUND_VOLUME, SOUND_PITCH);
         }
-
+    
         // Kick le joueur avec le message de ban (en rouge)
         Bukkit.getScheduler().runTask(this, () -> {
             if (player.isOnline()) {
