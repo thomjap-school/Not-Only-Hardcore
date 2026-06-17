@@ -62,7 +62,7 @@ public class HeadFeature implements Listener {
         meta.setDisplayName(ChatColor.RED + "Tête de " + owner.getName());
         meta.setLore(java.util.List.of(
                 ChatColor.GRAY + "Clic droit pour empoisonner",
-                ChatColor.GRAY + owner.getName() + " si il est en ligne."
+                ChatColor.GRAY + owner.getName() + " s'il est en ligne."
         ));
 
         // Stocke l'UUID du propriétaire dans les données persistantes de l'item
