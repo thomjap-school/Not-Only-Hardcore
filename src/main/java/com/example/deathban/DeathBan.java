@@ -85,29 +85,35 @@ public class DeathBan extends JavaPlugin implements Listener {
     public void onPvpDamage(EntityDamageByEntityEvent event) {
         if (!(event.getEntity() instanceof Player)) return;
         if (!(event.getDamager() instanceof Player)) return;
-
+    
         Player victim = (Player) event.getEntity();
-
-        if (isInventoryEmpty(victim)) {
+    
+        boolean empty = isInventoryEmpty(victim);
+        getLogger().info("[DEBUG] " + victim.getName() + " inventaire vide = " + empty);
+    
+        if (empty) {
             event.setCancelled(true);
+            getLogger().info("[DEBUG] Dégât annulé pour " + victim.getName());
         }
     }
 
     private boolean isInventoryEmpty(Player player) {
         PlayerInventory inv = player.getInventory();
-
-        for (ItemStack item : inv.getContents()) {
+    
+        ItemStack[] contents = inv.getContents();
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack item = contents[i];
             if (item != null && item.getType() != Material.AIR) {
                 return false;
             }
         }
-
-        if (inv.getHelmet() != null) return false;
-        if (inv.getChestplate() != null) return false;
-        if (inv.getLeggings() != null) return false;
-        if (inv.getBoots() != null) return false;
+    
+        if (inv.getHelmet() != null && inv.getHelmet().getType() != Material.AIR) return false;
+        if (inv.getChestplate() != null && inv.getChestplate().getType() != Material.AIR) return false;
+        if (inv.getLeggings() != null && inv.getLeggings().getType() != Material.AIR) return false;
+        if (inv.getBoots() != null && inv.getBoots().getType() != Material.AIR) return false;
         if (inv.getItemInOffHand().getType() != Material.AIR) return false;
-
+    
         return true;
     }
 }
