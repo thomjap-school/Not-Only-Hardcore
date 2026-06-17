@@ -12,6 +12,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.event.player.PlayerRespawnEvent;
 
 import java.io.File;
 import java.io.IOException;
@@ -214,6 +215,19 @@ public class PrisonFeature implements Listener {
         } else {
             Bukkit.getScheduler().runTask(plugin, () -> teleportToPrison(player));
         }
+    }
+
+    @EventHandler
+    public void onPlayerRespawn(PlayerRespawnEvent event) {
+        Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
+
+        if (!prisoners.containsKey(uuid)) return;
+
+        World prisonWorld = Bukkit.getWorld(PRISON_WORLD_NAME);
+        if (prisonWorld == null) return;
+
+        event.setRespawnLocation(new Location(prisonWorld, PRISON_X, PRISON_Y, PRISON_Z, PRISON_YAW, PRISON_PITCH));
     }
 
     @EventHandler
