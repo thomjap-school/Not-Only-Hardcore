@@ -88,12 +88,8 @@ public class DeathBan extends JavaPlugin implements Listener {
     
         Player victim = (Player) event.getEntity();
     
-        boolean empty = isInventoryEmpty(victim);
-        getLogger().info("[DEBUG] " + victim.getName() + " inventaire vide = " + empty);
-    
-        if (empty) {
+        if (isInventoryEmpty(victim)) {
             event.setCancelled(true);
-            getLogger().info("[DEBUG] Dégât annulé pour " + victim.getName());
         }
     }
 
