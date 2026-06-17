@@ -104,7 +104,6 @@ public class PrisonFeature implements Listener {
         dataConfig.set("prisoners." + uuid.toString(), null);
         saveData();
         prisoners.remove(uuid);
-        
     }
 
     public void imprison(Player player) {
@@ -139,7 +138,11 @@ public class PrisonFeature implements Listener {
 
         Location prisonLocation = new Location(prisonWorld, PRISON_X, PRISON_Y, PRISON_Z, PRISON_YAW, PRISON_PITCH);
         player.teleport(prisonLocation);
-        player.sendMessage(ChatColor.RED + "Vous êtes emprisonné pour " + PRISON_DURATION_MINUTES + " minutes.");
+        long remainingMillis = prisoners.get(player.getUniqueId()).releaseTimeMillis - System.currentTimeMillis();
+        long remainingMinutes = remainingMillis / 1000 / 60;
+        long remainingSeconds = (remainingMillis / 1000) % 60;
+    
+        player.sendMessage(ChatColor.RED + "Vous êtes emprisonné. Temps restant : " + remainingMinutes + "m " + remainingSeconds + "s");
     }
 
     private void release(Player player) {
