@@ -234,7 +234,7 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
             }
             if (args[1].equalsIgnoreCase("deathsound") && args[2].equalsIgnoreCase("sound")) {
                 return Arrays.stream(org.bukkit.Sound.values())
-                        .map(Enum::name)
+                        .map(org.bukkit.Sound::name)
                         .filter(name -> name.toLowerCase().startsWith(args[3].toLowerCase()))
                         .limit(50)
                         .collect(Collectors.toList());
