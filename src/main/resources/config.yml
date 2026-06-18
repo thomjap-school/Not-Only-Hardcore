@@ -1,0 +1,23 @@
+prison:
+  world: Jail
+  x: -32.0
+  y: 28.0
+  z: -74.0
+  yaw: 0.0
+  pitch: 0.0
+  duration-minutes: 2880
+
+head:
+  drop-chance-percent: 100.0
+  effect: POISON
+  duration-seconds: 30
+  amplifier: 0
+
+death:
+  sound: ENTITY_WITHER_SPAWN
+  sound-volume: 1.0
+  sound-pitch: 1.0
+
+new-player-protection:
+  duration-minutes: 30
+  resistance-amplifier: 4
