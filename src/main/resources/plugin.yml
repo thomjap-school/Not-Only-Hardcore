@@ -7,3 +7,4 @@ description: Ban un joueur pour une durée définie après sa mort.
 commands:
   db:
     description: Commandes DeathBan
+    usage: /db <unprison|set|reload>
