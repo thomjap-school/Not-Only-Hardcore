@@ -20,11 +20,12 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
     private final PrisonFeature prisonFeature;
 
     private static final List<String> SUBCOMMANDS = Arrays.asList("unprison", "set", "reload");
-    private static final List<String> SET_CATEGORIES = Arrays.asList("prison", "head", "deathsound");
+    private static final List<String> SET_CATEGORIES = Arrays.asList("prison", "head", "deathsound", "protection");
 
     private static final List<String> PRISON_KEYS = Arrays.asList("x", "y", "z", "world", "yaw", "pitch", "duration");
     private static final List<String> HEAD_KEYS = Arrays.asList("effect", "duration", "amplifier", "drop");
     private static final List<String> DEATHSOUND_KEYS = Arrays.asList("sound", "volume", "pitch");
+    private static final List<String> PROTECTION_KEYS = Arrays.asList("duration", "amplifier");
 
     public DeathBanCommand(ConfigManager configManager, PrisonFeature prisonFeature) {
         this.configManager = configManager;
@@ -64,6 +65,7 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ChatColor.YELLOW + "/db set prison <x|y|z|world|yaw|pitch|duration> <valeur>");
         sender.sendMessage(ChatColor.YELLOW + "/db set head <effect|duration|amplifier|drop> <valeur>");
         sender.sendMessage(ChatColor.YELLOW + "/db set deathsound <sound|volume|pitch> <valeur>");
+        sender.sendMessage(ChatColor.YELLOW + "/db set protection <duration|amplifier> <valeur>");
         sender.sendMessage(ChatColor.YELLOW + "/db reload");
     }
 
@@ -102,8 +104,10 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                     return handleSetHead(sender, key, value);
                 case "deathsound":
                     return handleSetDeathSound(sender, key, value);
+                case "protection":
+                    return handleSetProtection(sender, key, value);
                 default:
-                    sender.sendMessage(ChatColor.RED + "Catégorie inconnue. Utilise : prison, head, deathsound");
+                    sender.sendMessage(ChatColor.RED + "Catégorie inconnue. Utilise : prison, head, deathsound, protection");
                     return true;
             }
         } catch (NumberFormatException e) {
@@ -200,6 +204,22 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean handleSetProtection(CommandSender sender, String key, String value) {
+        switch (key) {
+            case "duration":
+                configManager.setNewPlayerProtectionDurationMinutes(Integer.parseInt(value));
+                break;
+            case "amplifier":
+                configManager.setNewPlayerProtectionAmplifier(Integer.parseInt(value));
+                break;
+            default:
+                sender.sendMessage(ChatColor.RED + "Clé inconnue pour 'protection'. Utilise : duration, amplifier");
+                return true;
+        }
+        sender.sendMessage(ChatColor.GREEN + "protection." + key + " = " + value);
+        return true;
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
@@ -222,6 +242,9 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                     break;
                 case "deathsound":
                     completions.addAll(DEATHSOUND_KEYS);
+                    break;
+                case "protection":
+                    completions.addAll(PROTECTION_KEYS);
                     break;
             }
         } else if (args.length == 4 && args[0].equalsIgnoreCase("set")) {
