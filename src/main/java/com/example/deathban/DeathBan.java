@@ -14,19 +14,24 @@ public class DeathBan extends JavaPlugin implements Listener {
 
     private PrisonFeature prisonFeature;
     private ConfigManager configManager;
+    private DuelFeature duelFeature;
 
     @Override
     public void onEnable() {
         configManager = new ConfigManager(this);
 
         Bukkit.getPluginManager().registerEvents(this, this);
-        Bukkit.getPluginManager().registerEvents(new HeadFeature(this, configManager), this);
+
+        duelFeature = new DuelFeature(this, configManager);
+        Bukkit.getPluginManager().registerEvents(duelFeature, this);
+
+        Bukkit.getPluginManager().registerEvents(new HeadFeature(this, configManager, duelFeature), this);
         Bukkit.getPluginManager().registerEvents(new NewPlayerProtection(this, configManager), this);
 
         prisonFeature = new PrisonFeature(this, configManager);
         Bukkit.getPluginManager().registerEvents(prisonFeature, this);
 
-        DeathBanCommand deathBanCommand = new DeathBanCommand(configManager, prisonFeature);
+        DeathBanCommand deathBanCommand = new DeathBanCommand(configManager, prisonFeature, duelFeature);
         getCommand("db").setExecutor(deathBanCommand);
         getCommand("db").setTabCompleter(deathBanCommand);
 
@@ -44,6 +49,12 @@ public class DeathBan extends JavaPlugin implements Listener {
         if (!(event.getDamager() instanceof Player)) return;
 
         Player victim = (Player) event.getEntity();
+        Player attacker = (Player) event.getDamager();
+
+        // Pendant un duel, le combat doit toujours pouvoir se terminer
+        if (duelFeature.isInDuel(victim) && duelFeature.isInDuel(attacker)) {
+            return;
+        }
 
         if (isInventoryEmpty(victim)) {
             event.setCancelled(true);
