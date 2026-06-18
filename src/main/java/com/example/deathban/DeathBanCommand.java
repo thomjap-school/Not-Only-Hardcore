@@ -18,33 +18,46 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
 
     private final ConfigManager configManager;
     private final PrisonFeature prisonFeature;
+    private final DuelFeature duelFeature;
 
-    private static final List<String> SUBCOMMANDS = Arrays.asList("unprison", "set", "reload");
-    private static final List<String> SET_CATEGORIES = Arrays.asList("prison", "head", "deathsound", "protection");
+    private static final List<String> SUBCOMMANDS = Arrays.asList("unprison", "set", "reload", "duel");
+    private static final List<String> SET_CATEGORIES = Arrays.asList("prison", "head", "deathsound", "protection", "duel");
 
     private static final List<String> PRISON_KEYS = Arrays.asList("x", "y", "z", "world", "yaw", "pitch", "duration");
     private static final List<String> HEAD_KEYS = Arrays.asList("effect", "duration", "amplifier", "drop");
     private static final List<String> DEATHSOUND_KEYS = Arrays.asList("sound", "volume", "pitch");
     private static final List<String> PROTECTION_KEYS = Arrays.asList("duration", "amplifier");
+    private static final List<String> DUEL_AXES = Arrays.asList("x", "y", "z", "yaw", "pitch");
+    private static final List<String> DUEL_ZONES = Arrays.asList("1", "2", "3");
+    private static final List<String> DUEL_SLOTS = Arrays.asList("a", "b");
+    private static final List<String> DUEL_GLOBAL_KEYS = Arrays.asList("world", "delay");
 
-    public DeathBanCommand(ConfigManager configManager, PrisonFeature prisonFeature) {
+    public DeathBanCommand(ConfigManager configManager, PrisonFeature prisonFeature, DuelFeature duelFeature) {
         this.configManager = configManager;
         this.prisonFeature = prisonFeature;
+        this.duelFeature = duelFeature;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!sender.isOp()) {
-            sender.sendMessage(ChatColor.RED + "Vous n'avez pas la permission.");
-            return true;
-        }
-
         if (args.length == 0) {
             sendHelp(sender);
             return true;
         }
 
-        switch (args[0].toLowerCase()) {
+        String sub = args[0].toLowerCase();
+
+        if (sub.equals("duel")) {
+            return handleDuel(sender, args);
+        }
+
+        // Les autres sous-commandes restent réservées aux ops
+        if (!sender.isOp()) {
+            sender.sendMessage(ChatColor.RED + "Vous n'avez pas la permission.");
+            return true;
+        }
+
+        switch (sub) {
             case "unprison":
                 return handleUnprison(sender, args);
             case "set":
@@ -66,6 +79,11 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ChatColor.YELLOW + "/db set head <effect|duration|amplifier|drop> <valeur>");
         sender.sendMessage(ChatColor.YELLOW + "/db set deathsound <sound|volume|pitch> <valeur>");
         sender.sendMessage(ChatColor.YELLOW + "/db set protection <duration|amplifier> <valeur>");
+        sender.sendMessage(ChatColor.YELLOW + "/db set duel world <nom>");
+        sender.sendMessage(ChatColor.YELLOW + "/db set duel delay <secondes>");
+        sender.sendMessage(ChatColor.YELLOW + "/db set duel <1|2|3> <a|b> <x|y|z|yaw|pitch> <valeur>");
+        sender.sendMessage(ChatColor.YELLOW + "/db duel <joueur>");
+        sender.sendMessage(ChatColor.YELLOW + "/db duel accept|deny <joueur>");
         sender.sendMessage(ChatColor.YELLOW + "/db reload");
     }
 
@@ -86,17 +104,65 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean handleDuel(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player)) {
+            sender.sendMessage(ChatColor.RED + "Seul un joueur peut utiliser cette commande.");
+            return true;
+        }
+        Player player = (Player) sender;
+
+        if (args.length < 2) {
+            sender.sendMessage(ChatColor.RED + "Usage : /db duel <joueur> | /db duel accept|deny <joueur>");
+            return true;
+        }
+
+        String second = args[1].toLowerCase();
+
+        if (second.equals("accept") || second.equals("deny")) {
+            if (args.length < 3) {
+                sender.sendMessage(ChatColor.RED + "Usage : /db duel " + second + " <joueur>");
+                return true;
+            }
+            String requesterName = args[2];
+            if (second.equals("accept")) {
+                duelFeature.acceptRequest(player, requesterName);
+            } else {
+                duelFeature.denyRequest(player, requesterName);
+            }
+            return true;
+        }
+
+        Player target = Bukkit.getPlayer(args[1]);
+        if (target == null) {
+            sender.sendMessage(ChatColor.RED + "Joueur introuvable ou hors ligne.");
+            return true;
+        }
+
+        duelFeature.sendRequest(player, target);
+        return true;
+    }
+
     private boolean handleSet(CommandSender sender, String[] args) {
-        if (args.length < 4) {
-            sender.sendMessage(ChatColor.RED + "Usage : /db set <prison|head|deathsound> <clé> <valeur>");
+        if (args.length < 3) {
+            sender.sendMessage(ChatColor.RED + "Usage : /db set <prison|head|deathsound|protection|duel> <clé> [valeur]");
             return true;
         }
 
         String category = args[1].toLowerCase();
-        String key = args[2].toLowerCase();
-        String value = args[3];
 
         try {
+            if (category.equals("duel")) {
+                return handleSetDuel(sender, args);
+            }
+
+            if (args.length < 4) {
+                sender.sendMessage(ChatColor.RED + "Usage : /db set " + category + " <clé> <valeur>");
+                return true;
+            }
+
+            String key = args[2].toLowerCase();
+            String value = args[3];
+
             switch (category) {
                 case "prison":
                     return handleSetPrison(sender, key, value, args);
@@ -107,13 +173,76 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                 case "protection":
                     return handleSetProtection(sender, key, value);
                 default:
-                    sender.sendMessage(ChatColor.RED + "Catégorie inconnue. Utilise : prison, head, deathsound, protection");
+                    sender.sendMessage(ChatColor.RED + "Catégorie inconnue. Utilise : prison, head, deathsound, protection, duel");
                     return true;
             }
         } catch (NumberFormatException e) {
-            sender.sendMessage(ChatColor.RED + "Valeur invalide : '" + value + "' n'est pas un nombre.");
+            sender.sendMessage(ChatColor.RED + "Valeur invalide : ce n'est pas un nombre.");
             return true;
         }
+    }
+
+    private boolean handleSetDuel(CommandSender sender, String[] args) {
+        // /db set duel world <nom>
+        // /db set duel delay <secondes>
+        // /db set duel <zone:1-3> <slot:a|b> <axe:x|y|z|yaw|pitch> <valeur>
+        String key = args[2].toLowerCase();
+
+        if (key.equals("world")) {
+            if (args.length < 4) {
+                sender.sendMessage(ChatColor.RED + "Usage : /db set duel world <nom>");
+                return true;
+            }
+            configManager.setDuelWorldName(args[3]);
+            sender.sendMessage(ChatColor.GREEN + "duel.world = " + args[3]);
+            return true;
+        }
+
+        if (key.equals("delay")) {
+            if (args.length < 4) {
+                sender.sendMessage(ChatColor.RED + "Usage : /db set duel delay <secondes>");
+                return true;
+            }
+            configManager.setDuelReturnDelaySeconds(Integer.parseInt(args[3]));
+            sender.sendMessage(ChatColor.GREEN + "duel.delay = " + args[3] + "s");
+            return true;
+        }
+
+        // Format zone : /db set duel <1|2|3> <a|b> <x|y|z|yaw|pitch> <valeur>
+        if (args.length < 6) {
+            sender.sendMessage(ChatColor.RED + "Usage : /db set duel <1|2|3> <a|b> <x|y|z|yaw|pitch> <valeur>");
+            return true;
+        }
+
+        int zone;
+        try {
+            zone = Integer.parseInt(key);
+        } catch (NumberFormatException e) {
+            sender.sendMessage(ChatColor.RED + "Clé inconnue pour 'duel'. Utilise : world, delay, ou un numéro de zone (1-3).");
+            return true;
+        }
+
+        if (!ConfigManager.isValidZone(zone)) {
+            sender.sendMessage(ChatColor.RED + "Zone invalide. Utilise 1, 2 ou 3.");
+            return true;
+        }
+
+        String slot = args[3].toLowerCase();
+        if (!ConfigManager.isValidSlot(slot)) {
+            sender.sendMessage(ChatColor.RED + "Slot invalide. Utilise 'a' ou 'b'.");
+            return true;
+        }
+
+        String axis = args[4].toLowerCase();
+        if (!DUEL_AXES.contains(axis)) {
+            sender.sendMessage(ChatColor.RED + "Axe invalide. Utilise : x, y, z, yaw, pitch.");
+            return true;
+        }
+
+        double value = Double.parseDouble(args[5]);
+        configManager.setDuelCoordinate(zone, slot, axis, value);
+        sender.sendMessage(ChatColor.GREEN + "duel.zones." + zone + "." + slot + "." + axis + " = " + value);
+        return true;
     }
 
     private boolean handleSetPrison(CommandSender sender, String key, String value, String[] args) {
@@ -231,7 +360,13 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                 Bukkit.getOnlinePlayers().forEach(p -> completions.add(p.getName()));
             } else if (args[0].equalsIgnoreCase("set")) {
                 completions.addAll(SET_CATEGORIES);
+            } else if (args[0].equalsIgnoreCase("duel")) {
+                completions.addAll(Arrays.asList("accept", "deny"));
+                Bukkit.getOnlinePlayers().forEach(p -> completions.add(p.getName()));
             }
+        } else if (args.length == 3 && args[0].equalsIgnoreCase("duel")
+                && (args[1].equalsIgnoreCase("accept") || args[1].equalsIgnoreCase("deny"))) {
+            Bukkit.getOnlinePlayers().forEach(p -> completions.add(p.getName()));
         } else if (args.length == 3 && args[0].equalsIgnoreCase("set")) {
             switch (args[1].toLowerCase()) {
                 case "prison":
@@ -246,9 +381,12 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                 case "protection":
                     completions.addAll(PROTECTION_KEYS);
                     break;
+                case "duel":
+                    completions.addAll(DUEL_GLOBAL_KEYS);
+                    completions.addAll(DUEL_ZONES);
+                    break;
             }
         } else if (args.length == 4 && args[0].equalsIgnoreCase("set")) {
-            // Suggestions de valeurs pour certaines clés
             if (args[1].equalsIgnoreCase("head") && args[2].equalsIgnoreCase("effect")) {
                 return Arrays.stream(PotionEffectType.values())
                         .map(PotionEffectType::getName)
@@ -262,6 +400,12 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                         .limit(50)
                         .collect(Collectors.toList());
             }
+            if (args[1].equalsIgnoreCase("duel") && DUEL_ZONES.contains(args[2])) {
+                completions.addAll(DUEL_SLOTS);
+            }
+        } else if (args.length == 5 && args[0].equalsIgnoreCase("set")
+                && args[1].equalsIgnoreCase("duel") && DUEL_ZONES.contains(args[2])) {
+            completions.addAll(DUEL_AXES);
         }
 
         String current = args[args.length - 1].toLowerCase();
