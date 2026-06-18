@@ -3,6 +3,8 @@ package com.example.deathban;
 import org.bukkit.Sound;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
 
 public class ConfigManager {
 
@@ -180,16 +182,13 @@ public class ConfigManager {
     // ===================== DEATH SOUND =====================
 
     public Sound getDeathSound() {
-        String name = config.getString("death.sound", "ENTITY_WITHER_SPAWN");
-        try {
-            return Sound.valueOf(name);
-        } catch (IllegalArgumentException e) {
-            return Sound.ENTITY_WITHER_SPAWN;
-        }
+        String name = config.getString("death.sound", "entity.wither_spawn");
+        Sound sound = Registry.SOUNDS.get(NamespacedKey.minecraft(name.toLowerCase()));
+        return sound != null ? sound : Sound.ENTITY_WITHER_SPAWN;
     }
-
+    
     public void setDeathSound(String soundName) {
-        config.set("death.sound", soundName.toUpperCase());
+        config.set("death.sound", soundName.toLowerCase());
         save();
     }
 
