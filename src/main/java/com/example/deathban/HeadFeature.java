@@ -20,32 +20,19 @@ import java.util.UUID;
 
 public class HeadFeature implements Listener {
 
-    // ==========================================================
-    // === CONFIGURATION : modifie ces valeurs selon tes besoins ===
-    // ==========================================================
-
-    // Chance que la tête drop à la mort (en pourcentage, 0-100)
-    private static final double DROP_CHANCE_PERCENT = 100;
-
-    // Durée du poison en secondes
-    private static final int POISON_DURATION_SECONDS = 30;
-
-    // Niveau du poison (0 = Poison I, 1 = Poison II, etc.)
-    private static final int POISON_AMPLIFIER = 0;
-
-    // ==========================================================
-
     private final DeathBan plugin;
+    private final ConfigManager configManager;
     private final NamespacedKey ownerKey;
 
-    public HeadFeature(DeathBan plugin) {
+    public HeadFeature(DeathBan plugin, ConfigManager configManager) {
         this.plugin = plugin;
+        this.configManager = configManager;
         this.ownerKey = new NamespacedKey(plugin, "head_owner_uuid");
     }
 
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent event) {
-        if (Math.random() * 100 > DROP_CHANCE_PERCENT) {
+        if (Math.random() * 100 > configManager.getHeadDropChancePercent()) {
             return;
         }
 
@@ -89,7 +76,7 @@ public class HeadFeature implements Listener {
         Player owner = Bukkit.getPlayer(ownerUuid);
         Player user = event.getPlayer();
 
-        // Le propriétaire doit être en ligne pour que le poison fonctionne
+        // Le propriétaire doit être en ligne pour que l'effet fonctionne
         if (owner == null || !owner.isOnline()) {
             user.sendMessage(ChatColor.RED + "Ce joueur n'est pas en ligne.");
             return;
@@ -97,16 +84,17 @@ public class HeadFeature implements Listener {
 
         event.setCancelled(true);
 
-        // Applique le poison
+        // Applique l'effet configuré
+        PotionEffectType effectType = configManager.getHeadEffect();
         owner.addPotionEffect(new PotionEffect(
-                PotionEffectType.POISON,
-                POISON_DURATION_SECONDS * 20, // ticks (20 ticks = 1 seconde)
-                POISON_AMPLIFIER
+                effectType,
+                configManager.getHeadDurationSeconds() * 20, // ticks (20 ticks = 1 seconde)
+                configManager.getHeadAmplifier()
         ));
 
         // Message uniquement aux deux joueurs concernés
-        owner.sendMessage(ChatColor.RED + "Vous avez été empoisonné via votre propre tête !");
-        user.sendMessage(ChatColor.RED + "Vous avez empoisonné " + owner.getName() + " avec sa tête.");
+        owner.sendMessage(ChatColor.RED + "Vous avez été affecté via votre propre tête !");
+        user.sendMessage(ChatColor.RED + "Vous avez affecté " + owner.getName() + " avec sa tête.");
 
         // Consomme la tête (retire 1 unité)
         ItemStack hand = user.getInventory().getItemInMainHand();
