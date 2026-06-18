@@ -22,21 +22,29 @@ public class HeadFeature implements Listener {
 
     private final DeathBan plugin;
     private final ConfigManager configManager;
+    private final DuelFeature duelFeature;
     private final NamespacedKey ownerKey;
 
-    public HeadFeature(DeathBan plugin, ConfigManager configManager) {
+    public HeadFeature(DeathBan plugin, ConfigManager configManager, DuelFeature duelFeature) {
         this.plugin = plugin;
         this.configManager = configManager;
+        this.duelFeature = duelFeature;
         this.ownerKey = new NamespacedKey(plugin, "head_owner_uuid");
     }
 
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent event) {
+        Player victim = event.getEntity();
+
+        // Pas de tête en cas de mort survenue pendant un duel
+        if (duelFeature.isDuelDeath(victim)) {
+            return;
+        }
+
         if (Math.random() * 100 > configManager.getHeadDropChancePercent()) {
             return;
         }
 
-        Player victim = event.getEntity();
         ItemStack head = createHeadFor(victim);
         event.getDrops().add(head);
     }
