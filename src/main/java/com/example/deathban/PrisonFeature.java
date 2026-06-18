@@ -22,24 +22,16 @@ import java.util.UUID;
 
 public class PrisonFeature implements Listener {
 
-    private static final long PRISON_DURATION_MINUTES = (48*60);
-
-    private static final String PRISON_WORLD_NAME = "Jail";
-
-    private static final double PRISON_X = -32;
-    private static final double PRISON_Y = 28;
-    private static final double PRISON_Z = -74;
-    private static final float PRISON_YAW = 0.0f;
-    private static final float PRISON_PITCH = 0.0f;
-
     private final DeathBan plugin;
+    private final ConfigManager configManager;
     private final Map<UUID, PrisonData> prisoners = new HashMap<>();
     private final java.util.Set<UUID> releasing = new java.util.HashSet<>();
     private File dataFile;
     private FileConfiguration dataConfig;
 
-    public PrisonFeature(DeathBan plugin) {
+    public PrisonFeature(DeathBan plugin, ConfigManager configManager) {
         this.plugin = plugin;
+        this.configManager = configManager;
         setupDataFile();
         loadPrisoners();
         startReleaseChecker();
@@ -111,7 +103,8 @@ public class PrisonFeature implements Listener {
         if (prisoners.containsKey(uuid)) return;
         Location currentLocation = player.getLocation();
 
-        long releaseTimeMillis = System.currentTimeMillis() + (PRISON_DURATION_MINUTES * 60 * 1000);
+        long releaseTimeMillis = System.currentTimeMillis()
+                + (configManager.getPrisonDurationMinutes() * 60 * 1000);
 
         PrisonData data = new PrisonData(
                 releaseTimeMillis,
@@ -130,18 +123,26 @@ public class PrisonFeature implements Listener {
     }
 
     private void teleportToPrison(Player player) {
-        World prisonWorld = Bukkit.getWorld(PRISON_WORLD_NAME);
+        String prisonWorldName = configManager.getPrisonWorldName();
+        World prisonWorld = Bukkit.getWorld(prisonWorldName);
         if (prisonWorld == null) {
-            plugin.getLogger().severe("[Prison] Le monde '" + PRISON_WORLD_NAME + "' n'existe pas ! Vérifie la configuration.");
+            plugin.getLogger().severe("[Prison] Le monde '" + prisonWorldName + "' n'existe pas ! Vérifie la configuration.");
             return;
         }
 
-        Location prisonLocation = new Location(prisonWorld, PRISON_X, PRISON_Y, PRISON_Z, PRISON_YAW, PRISON_PITCH);
+        Location prisonLocation = new Location(
+                prisonWorld,
+                configManager.getPrisonX(),
+                configManager.getPrisonY(),
+                configManager.getPrisonZ(),
+                configManager.getPrisonYaw(),
+                configManager.getPrisonPitch()
+        );
         player.teleport(prisonLocation);
         long remainingMillis = prisoners.get(player.getUniqueId()).releaseTimeMillis - System.currentTimeMillis();
         long remainingMinutes = remainingMillis / 1000 / 60;
         long remainingSeconds = (remainingMillis / 1000) % 60;
-    
+
         player.sendMessage(ChatColor.RED + "Vous êtes emprisonné. Temps restant : " + remainingMinutes + "m " + remainingSeconds + "s");
     }
 
@@ -228,10 +229,18 @@ public class PrisonFeature implements Listener {
 
         if (!prisoners.containsKey(uuid)) return;
 
-        World prisonWorld = Bukkit.getWorld(PRISON_WORLD_NAME);
+        String prisonWorldName = configManager.getPrisonWorldName();
+        World prisonWorld = Bukkit.getWorld(prisonWorldName);
         if (prisonWorld == null) return;
 
-        event.setRespawnLocation(new Location(prisonWorld, PRISON_X, PRISON_Y, PRISON_Z, PRISON_YAW, PRISON_PITCH));
+        event.setRespawnLocation(new Location(
+                prisonWorld,
+                configManager.getPrisonX(),
+                configManager.getPrisonY(),
+                configManager.getPrisonZ(),
+                configManager.getPrisonYaw(),
+                configManager.getPrisonPitch()
+        ));
     }
 
     @EventHandler
@@ -243,7 +252,8 @@ public class PrisonFeature implements Listener {
         if (releasing.contains(uuid)) return; // TP de libération, on laisse passer
         if (event.getTo() == null) return;
 
-        if (!event.getTo().getWorld().getName().equals(PRISON_WORLD_NAME)) {
+        String prisonWorldName = configManager.getPrisonWorldName();
+        if (!event.getTo().getWorld().getName().equals(prisonWorldName)) {
             event.setCancelled(true);
         }
     }
