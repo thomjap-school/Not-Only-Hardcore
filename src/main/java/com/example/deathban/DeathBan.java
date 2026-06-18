@@ -32,6 +32,7 @@ public class DeathBan extends JavaPlugin implements Listener {
     public void onEnable() {
         Bukkit.getPluginManager().registerEvents(this, this);
         Bukkit.getPluginManager().registerEvents(new HeadFeature(this), this);
+        Bukkit.getPluginManager().registerEvents(new NewPlayerProtection(this), this);
 
         prisonFeature = new PrisonFeature(this);
         Bukkit.getPluginManager().registerEvents(prisonFeature, this);
