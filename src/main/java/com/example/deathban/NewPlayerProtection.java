@@ -12,23 +12,13 @@ import org.bukkit.potion.PotionEffectType;
 
 public class NewPlayerProtection implements Listener {
 
-    // ==========================================================
-    // === CONFIGURATION ===
-    // ==========================================================
-
-    // Durée de la protection en minutes
-    private static final int PROTECTION_DURATION_MINUTES = 30;
-
-    // Amplificateur de résistance (4 = Résistance V, rend invincible)
-    private static final int RESISTANCE_AMPLIFIER = 4;
-
-    // ==========================================================
-
     private final DeathBan plugin;
+    private final ConfigManager configManager;
     private final NamespacedKey hasJoinedKey;
 
-    public NewPlayerProtection(DeathBan plugin) {
+    public NewPlayerProtection(DeathBan plugin, ConfigManager configManager) {
         this.plugin = plugin;
+        this.configManager = configManager;
         this.hasJoinedKey = new NamespacedKey(plugin, "has_joined_before");
     }
 
@@ -46,21 +36,23 @@ public class NewPlayerProtection implements Listener {
         player.getPersistentDataContainer()
                 .set(hasJoinedKey, PersistentDataType.BYTE, (byte) 1);
 
-        // Applique Résistance V pendant X minutes
-        int durationTicks = PROTECTION_DURATION_MINUTES * 60 * 20;
+        int durationMinutes = configManager.getNewPlayerProtectionDurationMinutes();
+        int amplifier = configManager.getNewPlayerProtectionAmplifier();
+        int durationTicks = durationMinutes * 60 * 20;
+
         player.addPotionEffect(new PotionEffect(
                 PotionEffectType.RESISTANCE,
                 durationTicks,
-                RESISTANCE_AMPLIFIER,
+                amplifier,
                 false,
                 true  // affiche les particules pour que ce soit visible
         ));
 
         player.sendMessage(ChatColor.GREEN + "✔ Bienvenue ! Vous êtes protégé pendant "
-                + PROTECTION_DURATION_MINUTES + " minutes.");
+                + durationMinutes + " minutes.");
 
         plugin.getLogger().info("[Protection] " + player.getName()
                 + " est un nouveau joueur, protection activée pour "
-                + PROTECTION_DURATION_MINUTES + " min.");
+                + durationMinutes + " min.");
     }
 }
