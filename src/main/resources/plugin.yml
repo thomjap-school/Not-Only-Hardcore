@@ -4,3 +4,6 @@ main: com.example.deathban.DeathBan
 api-version: '1.21'
 author: Toi
 description: Ban un joueur pour une durée définie après sa mort.
+commands:
+  db:
+    description: Commandes DeathBan
