@@ -41,6 +41,19 @@ public class ConfigManager {
         config.addDefault("new-player-protection.duration-minutes", 30);
         config.addDefault("new-player-protection.resistance-amplifier", 4);
 
+        config.addDefault("duel.world", "duel");
+        config.addDefault("duel.return-delay-seconds", 30);
+        for (int zone = 1; zone <= 3; zone++) {
+            for (String slot : new String[]{"a", "b"}) {
+                String base = "duel.zones." + zone + "." + slot + ".";
+                config.addDefault(base + "x", 0.0);
+                config.addDefault(base + "y", 100.0);
+                config.addDefault(base + "z", 0.0);
+                config.addDefault(base + "yaw", 0.0);
+                config.addDefault(base + "pitch", 0.0);
+            }
+        }
+
         config.options().copyDefaults(true);
         plugin.saveConfig();
     }
@@ -215,6 +228,63 @@ public class ConfigManager {
 
     public void setNewPlayerProtectionAmplifier(int amplifier) {
         config.set("new-player-protection.resistance-amplifier", amplifier);
+        save();
+    }
+
+    // ===================== DUEL =====================
+
+    public String getDuelWorldName() {
+        return config.getString("duel.world", "duel");
+    }
+
+    public void setDuelWorldName(String world) {
+        config.set("duel.world", world);
+        save();
+    }
+
+    public int getDuelReturnDelaySeconds() {
+        return config.getInt("duel.return-delay-seconds", 30);
+    }
+
+    public void setDuelReturnDelaySeconds(int seconds) {
+        config.set("duel.return-delay-seconds", seconds);
+        save();
+    }
+
+    public static boolean isValidZone(int zone) {
+        return zone >= 1 && zone <= 3;
+    }
+
+    public static boolean isValidSlot(String slot) {
+        return slot.equalsIgnoreCase("a") || slot.equalsIgnoreCase("b");
+    }
+
+    private String duelBase(int zone, String slot) {
+        return "duel.zones." + zone + "." + slot.toLowerCase() + ".";
+    }
+
+    public double getDuelX(int zone, String slot) {
+        return config.getDouble(duelBase(zone, slot) + "x");
+    }
+
+    public double getDuelY(int zone, String slot) {
+        return config.getDouble(duelBase(zone, slot) + "y");
+    }
+
+    public double getDuelZ(int zone, String slot) {
+        return config.getDouble(duelBase(zone, slot) + "z");
+    }
+
+    public float getDuelYaw(int zone, String slot) {
+        return (float) config.getDouble(duelBase(zone, slot) + "yaw");
+    }
+
+    public float getDuelPitch(int zone, String slot) {
+        return (float) config.getDouble(duelBase(zone, slot) + "pitch");
+    }
+
+    public void setDuelCoordinate(int zone, String slot, String axis, double value) {
+        config.set(duelBase(zone, slot) + axis.toLowerCase(), value);
         save();
     }
 }
