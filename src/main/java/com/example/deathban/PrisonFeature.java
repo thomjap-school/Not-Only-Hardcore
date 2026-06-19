@@ -71,8 +71,9 @@ public class PrisonFeature implements Listener {
                 double z = dataConfig.getDouble(path + "z");
                 float yaw = (float) dataConfig.getDouble(path + "yaw");
                 float pitch = (float) dataConfig.getDouble(path + "pitch");
+                boolean clearInventory = dataConfig.getBoolean(path + "clearInventory", false);
 
-                PrisonData data = new PrisonData(releaseTimeMillis, worldName, x, y, z, yaw, pitch);
+                PrisonData data = new PrisonData(releaseTimeMillis, worldName, x, y, z, yaw, pitch, clearInventory);
                 prisoners.put(uuid, data);
             }
             plugin.getLogger().info("[Prison] " + prisoners.size() + " prisonnier(s) chargé(s) depuis le fichier.");
@@ -89,6 +90,7 @@ public class PrisonFeature implements Listener {
         dataConfig.set(path + "z", data.returnZ);
         dataConfig.set(path + "yaw", data.returnYaw);
         dataConfig.set(path + "pitch", data.returnPitch);
+        dataConfig.set(path + "clearInventory", data.clearInventoryOnJoin);
         saveData();
     }
 
@@ -120,6 +122,45 @@ public class PrisonFeature implements Listener {
         savePrisoner(uuid, data);
 
         teleportToPrison(player);
+    }
+
+    /**
+     * Emprisonne un joueur actuellement hors ligne (ex : forfait de duel après
+     * déconnexion prolongée). Comme on ne peut pas connaître sa position en jeu
+     * ni accéder à son inventaire en direct, on utilise le spawn du monde
+     * principal comme position de retour par défaut, et on marque son
+     * inventaire pour être vidé à sa prochaine connexion (avant la téléportation
+     * en prison), juste comme une mort classique.
+     */
+    public void imprisonOffline(org.bukkit.OfflinePlayer offlinePlayer) {
+        UUID uuid = offlinePlayer.getUniqueId();
+        if (prisoners.containsKey(uuid)) return;
+
+        World mainWorld = Bukkit.getWorld("world");
+        if (mainWorld == null) {
+            mainWorld = Bukkit.getWorlds().get(0);
+        }
+        Location fallbackReturn = mainWorld.getSpawnLocation();
+
+        long releaseTimeMillis = System.currentTimeMillis()
+                + (configManager.getPrisonDurationMinutes() * 60 * 1000);
+
+        PrisonData data = new PrisonData(
+                releaseTimeMillis,
+                fallbackReturn.getWorld().getName(),
+                fallbackReturn.getX(),
+                fallbackReturn.getY(),
+                fallbackReturn.getZ(),
+                fallbackReturn.getYaw(),
+                fallbackReturn.getPitch(),
+                true // clearInventoryOnJoin
+        );
+
+        prisoners.put(uuid, data);
+        savePrisoner(uuid, data);
+
+        plugin.getLogger().info("[Prison] " + offlinePlayer.getName()
+                + " emprisonné hors ligne (forfait de duel), inventaire sera vidé à la reconnexion.");
     }
 
     private void teleportToPrison(Player player) {
@@ -213,6 +254,12 @@ public class PrisonFeature implements Listener {
         if (!prisoners.containsKey(uuid)) return;
 
         PrisonData data = prisoners.get(uuid);
+
+        if (data.clearInventoryOnJoin) {
+            player.getInventory().clear();
+            player.sendMessage(ChatColor.RED + "Vous avez perdu le duel par forfait (déconnexion). Votre inventaire a été vidé.");
+        }
+
         long now = System.currentTimeMillis();
 
         if (now >= data.releaseTimeMillis) {
@@ -263,8 +310,13 @@ public class PrisonFeature implements Listener {
         final String returnWorldName;
         final double returnX, returnY, returnZ;
         final float returnYaw, returnPitch;
+        final boolean clearInventoryOnJoin;
 
         PrisonData(long releaseTimeMillis, String returnWorldName, double returnX, double returnY, double returnZ, float returnYaw, float returnPitch) {
+            this(releaseTimeMillis, returnWorldName, returnX, returnY, returnZ, returnYaw, returnPitch, false);
+        }
+
+        PrisonData(long releaseTimeMillis, String returnWorldName, double returnX, double returnY, double returnZ, float returnYaw, float returnPitch, boolean clearInventoryOnJoin) {
             this.releaseTimeMillis = releaseTimeMillis;
             this.returnWorldName = returnWorldName;
             this.returnX = returnX;
@@ -272,6 +324,7 @@ public class PrisonFeature implements Listener {
             this.returnZ = returnZ;
             this.returnYaw = returnYaw;
             this.returnPitch = returnPitch;
+            this.clearInventoryOnJoin = clearInventoryOnJoin;
         }
     }
 }
