@@ -4,6 +4,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -11,10 +13,13 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -40,12 +45,73 @@ public class DuelFeature implements Listener {
     // Snapshot (position + inventaire) capturé à la déconnexion, utilisé en cas de forfait
     private final Map<UUID, DisconnectSnapshot> disconnectSnapshots = new HashMap<>();
 
-    // Joueurs ayant perdu par forfait, à punir (drop déjà fait, emprisonnement) dès leur prochaine connexion
+    // Joueurs ayant perdu par forfait, à punir (drop déjà fait, emprisonnement) dès leur prochaine connexion.
+    // Persisté sur disque pour survivre à un crash/redémarrage du serveur entre le forfait et la reconnexion.
     private final java.util.Set<UUID> pendingForfeitPunishment = new java.util.HashSet<>();
+    private File forfeitFile;
+    private FileConfiguration forfeitConfig;
+
+    // Gagnants en attente de leur téléportation de retour (entre la fin du duel et le délai écoulé).
+    // Sert à bloquer toute téléportation parasite (ex: perle d'ender lancée juste avant la fin du duel)
+    // qui pourrait interférer avec le retour à la position d'avant duel.
+    private final java.util.Set<UUID> pendingReturn = new java.util.HashSet<>();
 
     public DuelFeature(DeathBan plugin, ConfigManager configManager) {
         this.plugin = plugin;
         this.configManager = configManager;
+        setupForfeitFile();
+        loadPendingForfeits();
+    }
+
+    private void setupForfeitFile() {
+        forfeitFile = new File(plugin.getDataFolder(), "pending_forfeits.yml");
+        if (!forfeitFile.exists()) {
+            plugin.getDataFolder().mkdirs();
+            try {
+                forfeitFile.createNewFile();
+            } catch (IOException e) {
+                plugin.getLogger().severe("[Duel] Impossible de créer pending_forfeits.yml : " + e.getMessage());
+            }
+        }
+        forfeitConfig = YamlConfiguration.loadConfiguration(forfeitFile);
+    }
+
+    private void loadPendingForfeits() {
+        java.util.List<String> uuids = forfeitConfig.getStringList("pending");
+        for (String s : uuids) {
+            try {
+                pendingForfeitPunishment.add(UUID.fromString(s));
+            } catch (IllegalArgumentException ignored) {
+                // entrée corrompue, on l'ignore
+            }
+        }
+        if (!pendingForfeitPunishment.isEmpty()) {
+            plugin.getLogger().info("[Duel] " + pendingForfeitPunishment.size()
+                    + " forfait(s) en attente chargé(s) depuis le fichier.");
+        }
+    }
+
+    private void saveForfeitFile() {
+        java.util.List<String> uuids = new java.util.ArrayList<>();
+        for (UUID uuid : pendingForfeitPunishment) {
+            uuids.add(uuid.toString());
+        }
+        forfeitConfig.set("pending", uuids);
+        try {
+            forfeitConfig.save(forfeitFile);
+        } catch (IOException e) {
+            plugin.getLogger().severe("[Duel] Impossible de sauvegarder pending_forfeits.yml : " + e.getMessage());
+        }
+    }
+
+    private void addPendingForfeit(UUID uuid) {
+        pendingForfeitPunishment.add(uuid);
+        saveForfeitFile();
+    }
+
+    private void removePendingForfeit(UUID uuid) {
+        pendingForfeitPunishment.remove(uuid);
+        saveForfeitFile();
     }
 
     /**
@@ -154,6 +220,12 @@ public class DuelFeature implements Listener {
         activeDuels.put(requester.getUniqueId(), duel);
         activeDuels.put(target.getUniqueId(), duel);
 
+        // Supprime toute perle d'ender déjà en vol lancée par l'un des deux joueurs
+        // avant le duel : sans ça, elle pourrait atterrir une fois le combat commencé
+        // et re-téléporter le joueur hors de l'arène.
+        removeInFlightEnderPearls(requester);
+        removeInFlightEnderPearls(target);
+
         Location locA = new Location(duelWorld,
                 configManager.getDuelX(zone, "a"), configManager.getDuelY(zone, "a"), configManager.getDuelZ(zone, "a"),
                 configManager.getDuelYaw(zone, "a"), configManager.getDuelPitch(zone, "a"));
@@ -166,6 +238,21 @@ public class DuelFeature implements Listener {
 
         requester.sendMessage(ChatColor.GOLD + "Le duel contre " + target.getName() + " commence !");
         target.sendMessage(ChatColor.GOLD + "Le duel contre " + requester.getName() + " commence !");
+    }
+
+    /**
+     * Supprime les perles d'ender actuellement en vol (entité EnderPearl)
+     * appartenant à ce joueur, dans le monde où il se trouve.
+     */
+    private void removeInFlightEnderPearls(Player player) {
+        World world = player.getWorld();
+        for (org.bukkit.entity.Entity entity : world.getEntitiesByClass(org.bukkit.entity.EnderPearl.class)) {
+            org.bukkit.entity.EnderPearl pearl = (org.bukkit.entity.EnderPearl) entity;
+            if (pearl.getShooter() instanceof Player
+                    && ((Player) pearl.getShooter()).getUniqueId().equals(player.getUniqueId())) {
+                pearl.remove();
+            }
+        }
     }
 
     private int pickFreeZone() {
@@ -191,6 +278,27 @@ public class DuelFeature implements Listener {
         return activeDuels.containsKey(player.getUniqueId());
     }
 
+    /**
+     * Annule toute téléportation parasite par perle d'ender qui atterrirait
+     * pendant qu'un gagnant attend sa téléportation de retour après duel.
+     * Pendant le combat lui-même, les perles restent autorisées (mécanique
+     * PvP normale) : seule la fenêtre d'attente post-victoire est protégée,
+     * pour éviter qu'une perle lancée juste avant la fin du duel ne vienne
+     * perturber le TP de retour du gagnant.
+     */
+    @EventHandler
+    public void onPlayerTeleport(PlayerTeleportEvent event) {
+        if (event.getCause() != PlayerTeleportEvent.TeleportCause.ENDER_PEARL) return;
+
+        Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
+
+        if (pendingReturn.contains(uuid)) {
+            event.setCancelled(true);
+            player.sendMessage(ChatColor.RED + "Votre perle d'ender a été annulée (retour de duel en cours).");
+        }
+    }
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player loser = event.getEntity();
@@ -214,12 +322,49 @@ public class DuelFeature implements Listener {
 
         winner.sendMessage(ChatColor.GREEN + "Vous avez gagné le duel ! Retour dans " + delaySeconds + "s.");
 
+        scheduleWinnerReturn(winner, returnLocation, delaySeconds);
+    }
+
+    /**
+     * Planifie le retour du gagnant après le délai configuré.
+     * 1 seconde avant la téléportation, nettoie les items au sol dans un rayon
+     * de 100 blocs autour du gagnant, pour éviter que le loot du combat (ou
+     * celui du perdant) ne traîne ou soit récupéré par quelqu'un d'autre.
+     */
+    private void scheduleWinnerReturn(Player winner, Location returnLocation, int delaySeconds) {
+        long cleanupDelayTicks = Math.max(0, delaySeconds - 1) * 20L;
+        long teleportDelayTicks = delaySeconds * 20L;
+
+        pendingReturn.add(winner.getUniqueId());
+
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (winner.isOnline()) {
+                clearNearbyItems(winner.getLocation(), 100.0);
+            }
+        }, cleanupDelayTicks);
+
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            pendingReturn.remove(winner.getUniqueId());
             if (winner.isOnline()) {
                 winner.teleport(returnLocation);
                 winner.sendMessage(ChatColor.GREEN + "Vous avez été ramené à votre position d'avant duel.");
             }
-        }, delaySeconds * 20L);
+        }, teleportDelayTicks);
+    }
+
+    /**
+     * Supprime tous les items au sol (entités Item) dans un rayon donné
+     * autour d'une position.
+     */
+    private void clearNearbyItems(Location center, double radius) {
+        World world = center.getWorld();
+        if (world == null) return;
+
+        for (org.bukkit.entity.Entity entity : world.getNearbyEntities(center, radius, radius, radius)) {
+            if (entity instanceof org.bukkit.entity.Item) {
+                entity.remove();
+            }
+        }
     }
 
     // ===================== DÉCONNEXION =====================
@@ -290,8 +435,8 @@ public class DuelFeature implements Listener {
                     }
                 }
             }
-            // Le joueur sera vidé et emprisonné dès sa prochaine connexion
-            pendingForfeitPunishment.add(disconnectedUuid);
+            // Le joueur sera vidé et emprisonné dès sa prochaine connexion (persisté sur disque)
+            addPendingForfeit(disconnectedUuid);
 
             if (winner != null && winner.isOnline()) {
                 Location returnLocation = stillActive.getReturnLocation(winnerUuid);
@@ -300,12 +445,7 @@ public class DuelFeature implements Listener {
                 winner.sendMessage(ChatColor.GREEN + "Votre adversaire ne s'est pas reconnecté à temps. Vous gagnez le duel !");
                 winner.sendMessage(ChatColor.GREEN + "Retour dans " + delaySeconds + "s.");
 
-                Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                    if (winner.isOnline()) {
-                        winner.teleport(returnLocation);
-                        winner.sendMessage(ChatColor.GREEN + "Vous avez été ramené à votre position d'avant duel.");
-                    }
-                }, delaySeconds * 20L);
+                scheduleWinnerReturn(winner, returnLocation, delaySeconds);
             }
 
             plugin.getLogger().info("[Duel] " + disconnectedUuid + " ne s'est pas reconnecté à temps, duel perdu par forfait. Items droppés, emprisonnement prévu à la reconnexion.");
@@ -320,7 +460,8 @@ public class DuelFeature implements Listener {
         UUID uuid = player.getUniqueId();
 
         // Cas 1 : le joueur revient après que son forfait a déjà été acté (items déjà droppés)
-        if (pendingForfeitPunishment.remove(uuid)) {
+        if (pendingForfeitPunishment.contains(uuid)) {
+            removePendingForfeit(uuid);
             Bukkit.getScheduler().runTask(plugin, () -> {
                 player.getInventory().clear();
                 player.getInventory().setHelmet(null);
