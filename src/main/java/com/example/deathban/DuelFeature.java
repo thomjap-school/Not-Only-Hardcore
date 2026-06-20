@@ -346,6 +346,10 @@ public class DuelFeature implements Listener {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             pendingReturn.remove(winner.getUniqueId());
             if (winner.isOnline()) {
+                // Supprime une éventuelle perle d'ender lancée par le gagnant juste avant
+                // sa téléportation de retour : sinon elle pourrait atterrir une fois revenu
+                // dans le monde d'origine et le re-téléporter ailleurs.
+                removeInFlightEnderPearls(winner);
                 winner.teleport(returnLocation);
                 winner.sendMessage(ChatColor.GREEN + "Vous avez été ramené à votre position d'avant duel.");
             }
