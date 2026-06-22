@@ -260,10 +260,12 @@ public class DuelFeature implements Listener {
         for (ActiveDuel duel : new java.util.HashSet<>(activeDuels.values())) {
             if (duel.zone >= 1 && duel.zone <= 3) used[duel.zone] = true;
         }
+        java.util.List<Integer> available = new java.util.ArrayList<>();
         for (int z = 1; z <= 3; z++) {
-            if (!used[z]) return z;
+            if (!used[z]) available.add(z);
         }
-        return -1;
+        if (available.isEmpty()) return -1;
+        return available.get(new java.util.Random().nextInt(available.size()));
     }
 
     public boolean isInDuel(Player player) {
