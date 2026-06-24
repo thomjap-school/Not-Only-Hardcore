@@ -21,8 +21,9 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
     private final DuelFeature duelFeature;
     private final AlexBanniereFeature alexBanniereFeature;
     private final AutoMessageFeature autoMessageFeature;
+    private final KitFeature kitFeature;
 
-    private static final List<String> SUBCOMMANDS = Arrays.asList("unprison", "set", "reload", "duel", "alexbanniere");
+    private static final List<String> SUBCOMMANDS = Arrays.asList("unprison", "set", "reload", "duel", "alexbanniere", "kit");
     private static final List<String> SET_CATEGORIES = Arrays.asList("prison", "head", "deathsound", "protection", "duel", "automessage", "releaseprotection");
 
     private static final List<String> PRISON_KEYS = Arrays.asList("x", "y", "z", "world", "yaw", "pitch", "duration");
@@ -36,12 +37,13 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
     private static final List<String> DUEL_GLOBAL_KEYS = Arrays.asList("world", "delay");
     private static final List<String> AUTOMESSAGE_KEYS = Arrays.asList("on", "off", "interval");
 
-    public DeathBanCommand(ConfigManager configManager, PrisonFeature prisonFeature, DuelFeature duelFeature, AlexBanniereFeature alexBanniereFeature, AutoMessageFeature autoMessageFeature) {
+    public DeathBanCommand(ConfigManager configManager, PrisonFeature prisonFeature, DuelFeature duelFeature, AlexBanniereFeature alexBanniereFeature, AutoMessageFeature autoMessageFeature, KitFeature kitFeature) {
         this.configManager = configManager;
         this.prisonFeature = prisonFeature;
         this.duelFeature = duelFeature;
         this.alexBanniereFeature = alexBanniereFeature;
         this.autoMessageFeature = autoMessageFeature;
+        this.kitFeature = kitFeature;
     }
 
     @Override
@@ -55,6 +57,15 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
 
         if (sub.equals("duel")) {
             return handleDuel(sender, args);
+        }
+
+        if (sub.equals("kit")) {
+            if (!(sender instanceof Player)) {
+                sender.sendMessage(ChatColor.RED + "Seul un joueur peut utiliser cette commande.");
+                return true;
+            }
+            kitFeature.giveKit((Player) sender);
+            return true;
         }
 
         // Les autres sous-commandes restent réservées aux ops
@@ -73,7 +84,8 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                 prisonFeature.reload();
                 duelFeature.reload();
                 autoMessageFeature.reload();
-                sender.sendMessage(ChatColor.GREEN + "Configuration rechargée (config.yml, prisoners.yml, pending_forfeits.yml, automessage.yml).");
+                kitFeature.reload();
+                sender.sendMessage(ChatColor.GREEN + "Configuration rechargée (config.yml, prisoners.yml, pending_forfeits.yml, automessage.yml, kit.yml).");
                 return true;
             case "alexbanniere":
                 return handleAlexBanniere(sender, args);
@@ -94,6 +106,7 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ChatColor.YELLOW + "/db set duel world <nom>");
         sender.sendMessage(ChatColor.YELLOW + "/db set duel delay <secondes>");
         sender.sendMessage(ChatColor.YELLOW + "/db set duel <1|2|3> <a|b> <x|y|z|yaw|pitch> <valeur>");
+        sender.sendMessage(ChatColor.YELLOW + "/db kit");
         sender.sendMessage(ChatColor.YELLOW + "/db duel <joueur>");
         sender.sendMessage(ChatColor.YELLOW + "/db duel accept|deny <joueur>");
         sender.sendMessage(ChatColor.YELLOW + "/db alexbanniere on|off");
