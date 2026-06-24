@@ -22,8 +22,9 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
     private final AlexBanniereFeature alexBanniereFeature;
     private final AutoMessageFeature autoMessageFeature;
     private final KitFeature kitFeature;
+    private final NickFeature nickFeature;
 
-    private static final List<String> SUBCOMMANDS = Arrays.asList("unprison", "set", "reload", "duel", "alexbanniere", "kit");
+    private static final List<String> SUBCOMMANDS = Arrays.asList("unprison", "set", "reload", "duel", "alexbanniere", "kit", "nick");
     private static final List<String> SET_CATEGORIES = Arrays.asList("prison", "head", "deathsound", "protection", "duel", "automessage", "releaseprotection");
 
     private static final List<String> PRISON_KEYS = Arrays.asList("x", "y", "z", "world", "yaw", "pitch", "duration");
@@ -37,13 +38,14 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
     private static final List<String> DUEL_GLOBAL_KEYS = Arrays.asList("world", "delay");
     private static final List<String> AUTOMESSAGE_KEYS = Arrays.asList("on", "off", "interval");
 
-    public DeathBanCommand(ConfigManager configManager, PrisonFeature prisonFeature, DuelFeature duelFeature, AlexBanniereFeature alexBanniereFeature, AutoMessageFeature autoMessageFeature, KitFeature kitFeature) {
+    public DeathBanCommand(ConfigManager configManager, PrisonFeature prisonFeature, DuelFeature duelFeature, AlexBanniereFeature alexBanniereFeature, AutoMessageFeature autoMessageFeature, KitFeature kitFeature, NickFeature nickFeature) {
         this.configManager = configManager;
         this.prisonFeature = prisonFeature;
         this.duelFeature = duelFeature;
         this.alexBanniereFeature = alexBanniereFeature;
         this.autoMessageFeature = autoMessageFeature;
         this.kitFeature = kitFeature;
+        this.nickFeature = nickFeature;
     }
 
     @Override
@@ -66,6 +68,10 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
             }
             kitFeature.giveKit((Player) sender);
             return true;
+        }
+
+        if (sub.equals("nick")) {
+            return handleNick(sender, args);
         }
 
         // Les autres sous-commandes restent réservées aux ops
@@ -106,6 +112,8 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ChatColor.YELLOW + "/db set duel world <nom>");
         sender.sendMessage(ChatColor.YELLOW + "/db set duel delay <secondes>");
         sender.sendMessage(ChatColor.YELLOW + "/db set duel <1|2|3> <a|b> <x|y|z|yaw|pitch> <valeur>");
+        sender.sendMessage(ChatColor.YELLOW + "/db nick <pseudo>");
+        sender.sendMessage(ChatColor.YELLOW + "/db nick reset [joueur]");
         sender.sendMessage(ChatColor.YELLOW + "/db kit");
         sender.sendMessage(ChatColor.YELLOW + "/db duel <joueur>");
         sender.sendMessage(ChatColor.YELLOW + "/db duel accept|deny <joueur>");
@@ -422,6 +430,72 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean handleNick(CommandSender sender, String[] args) {
+        if (!sender.isOp()) {
+            sender.sendMessage(ChatColor.RED + "Vous n'avez pas la permission.");
+            return true;
+        }
+
+        if (args.length < 2) {
+            sender.sendMessage(ChatColor.RED + "Usage : /db nick <pseudo> | /db nick reset [joueur]");
+            return true;
+        }
+
+        // /db nick reset [joueur]
+        if (args[1].equalsIgnoreCase("reset")) {
+            Player target;
+            if (args.length >= 3) {
+                target = Bukkit.getPlayer(args[2]);
+                if (target == null) {
+                    sender.sendMessage(ChatColor.RED + "Joueur introuvable ou hors ligne.");
+                    return true;
+                }
+            } else {
+                if (!(sender instanceof Player)) {
+                    sender.sendMessage(ChatColor.RED + "Précisez un joueur : /db nick reset <joueur>");
+                    return true;
+                }
+                target = (Player) sender;
+            }
+            nickFeature.resetNick(target);
+            if (!target.equals(sender)) {
+                sender.sendMessage(ChatColor.GREEN + "Nick de " + target.getName() + " réinitialisé.");
+            }
+            return true;
+        }
+
+        // /db nick <pseudo> — s'applique à soi-même ou à un joueur cible
+        // Support : /db nick <pseudo> ou /db nick <joueur> <pseudo>
+        Player target;
+        String nick;
+
+        if (args.length >= 3 && Bukkit.getPlayer(args[1]) != null) {
+            // /db nick <joueur> <pseudo>
+            target = Bukkit.getPlayer(args[1]);
+            nick = String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length));
+        } else {
+            // /db nick <pseudo>
+            if (!(sender instanceof Player)) {
+                sender.sendMessage(ChatColor.RED + "Usage depuis la console : /db nick <joueur> <pseudo>");
+                return true;
+            }
+            target = (Player) sender;
+            nick = String.join(" ", java.util.Arrays.copyOfRange(args, 1, args.length));
+        }
+
+        if (nick.length() > 32) {
+            sender.sendMessage(ChatColor.RED + "Le nick ne peut pas dépasser 32 caractères.");
+            return true;
+        }
+
+        nickFeature.setNick(target, nick);
+        if (!target.equals(sender)) {
+            sender.sendMessage(ChatColor.GREEN + "Nick de " + target.getName() + " changé en : "
+                    + ChatColor.translateAlternateColorCodes('&', nick));
+        }
+        return true;
+    }
+
     private boolean handleSetAutoMessage(CommandSender sender, String[] args) {
         // args : [0]=set [1]=automessage [2]=clé [3]=valeur(optionnel)
         if (args.length < 3) {
@@ -494,6 +568,9 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                 completions.addAll(SET_CATEGORIES);
             } else if (args[0].equalsIgnoreCase("duel")) {
                 completions.addAll(Arrays.asList("accept", "deny"));
+                Bukkit.getOnlinePlayers().forEach(p -> completions.add(p.getName()));
+            } else if (args[0].equalsIgnoreCase("nick")) {
+                completions.add("reset");
                 Bukkit.getOnlinePlayers().forEach(p -> completions.add(p.getName()));
             } else if (args[0].equalsIgnoreCase("alexbanniere")) {
                 completions.addAll(Arrays.asList("on", "off"));
