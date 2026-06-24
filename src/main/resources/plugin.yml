@@ -1,6 +1,6 @@
 name: DeathBan
 version: '${version}'
-main: com.example.deathban.DeathBan
+main: thomjap.deathban.DeathBan
 api-version: '1.21'
 author: Toi
 description: Exclure un joueur pour une durée définie après sa mort.

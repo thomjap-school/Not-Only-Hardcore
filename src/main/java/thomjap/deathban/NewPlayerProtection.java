@@ -1,4 +1,4 @@
-package com.example.deathban;
+package thomjap.deathban;
 
 import org.bukkit.ChatColor;
 import org.bukkit.NamespacedKey;
