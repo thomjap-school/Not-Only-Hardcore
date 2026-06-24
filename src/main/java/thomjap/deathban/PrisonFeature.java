@@ -24,6 +24,7 @@ public class PrisonFeature implements Listener {
 
     private final DeathBan plugin;
     private final ConfigManager configManager;
+    private KitFeature kitFeature;
     private final Map<UUID, PrisonData> prisoners = new HashMap<>();
     private final java.util.Set<UUID> releasing = new java.util.HashSet<>();
     private File dataFile;
@@ -100,6 +101,10 @@ public class PrisonFeature implements Listener {
         prisoners.remove(uuid);
     }
 
+    public void setKitFeature(KitFeature kitFeature) {
+        this.kitFeature = kitFeature;
+    }
+
     public void reload() {
         dataConfig = YamlConfiguration.loadConfiguration(dataFile);
         plugin.getLogger().info("[Prison] Configuration rechargée depuis prisoners.yml.");
@@ -125,6 +130,10 @@ public class PrisonFeature implements Listener {
 
         prisoners.put(uuid, data);
         savePrisoner(uuid, data);
+
+        if (kitFeature != null) {
+            kitFeature.resetKit(uuid);
+        }
 
         teleportToPrison(player);
     }
@@ -215,6 +224,10 @@ public class PrisonFeature implements Listener {
                 + (configManager.getReleaseProtectionAmplifier() + 1)
                 + " pendant " + configManager.getReleaseProtectionDurationMinutes() + " minutes.");
         removePrisoner(uuid);
+
+        if (kitFeature != null) {
+            kitFeature.resetKit(uuid);
+        }
     }
 
     /**
