@@ -20,9 +20,10 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
     private final PrisonFeature prisonFeature;
     private final DuelFeature duelFeature;
     private final AlexBanniereFeature alexBanniereFeature;
+    private final AutoMessageFeature autoMessageFeature;
 
     private static final List<String> SUBCOMMANDS = Arrays.asList("unprison", "set", "reload", "duel", "alexbanniere");
-    private static final List<String> SET_CATEGORIES = Arrays.asList("prison", "head", "deathsound", "protection", "duel");
+    private static final List<String> SET_CATEGORIES = Arrays.asList("prison", "head", "deathsound", "protection", "duel", "automessage");
 
     private static final List<String> PRISON_KEYS = Arrays.asList("x", "y", "z", "world", "yaw", "pitch", "duration");
     private static final List<String> HEAD_KEYS = Arrays.asList("effect", "duration", "amplifier", "drop");
@@ -32,12 +33,14 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
     private static final List<String> DUEL_ZONES = Arrays.asList("1", "2", "3");
     private static final List<String> DUEL_SLOTS = Arrays.asList("a", "b");
     private static final List<String> DUEL_GLOBAL_KEYS = Arrays.asList("world", "delay");
+    private static final List<String> AUTOMESSAGE_KEYS = Arrays.asList("on", "off", "interval");
 
-    public DeathBanCommand(ConfigManager configManager, PrisonFeature prisonFeature, DuelFeature duelFeature, AlexBanniereFeature alexBanniereFeature) {
+    public DeathBanCommand(ConfigManager configManager, PrisonFeature prisonFeature, DuelFeature duelFeature, AlexBanniereFeature alexBanniereFeature, AutoMessageFeature autoMessageFeature) {
         this.configManager = configManager;
         this.prisonFeature = prisonFeature;
         this.duelFeature = duelFeature;
         this.alexBanniereFeature = alexBanniereFeature;
+        this.autoMessageFeature = autoMessageFeature;
     }
 
     @Override
@@ -89,6 +92,8 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ChatColor.YELLOW + "/db duel <joueur>");
         sender.sendMessage(ChatColor.YELLOW + "/db duel accept|deny <joueur>");
         sender.sendMessage(ChatColor.YELLOW + "/db alexbanniere on|off");
+        sender.sendMessage(ChatColor.YELLOW + "/db set automessage on|off");
+        sender.sendMessage(ChatColor.YELLOW + "/db set automessage interval <minutes>");
         sender.sendMessage(ChatColor.YELLOW + "/db reload");
     }
 
@@ -183,6 +188,10 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                 return handleSetDuel(sender, args);
             }
 
+            if (category.equals("automessage")) {
+                return handleSetAutoMessage(sender, args.length >= 3 ? args[2].toLowerCase() : "");
+            }
+
             if (args.length < 4) {
                 sender.sendMessage(ChatColor.RED + "Usage : /db set " + category + " <clé> <valeur>");
                 return true;
@@ -201,7 +210,7 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                 case "protection":
                     return handleSetProtection(sender, key, value);
                 default:
-                    sender.sendMessage(ChatColor.RED + "Catégorie inconnue. Utilise : prison, head, deathsound, protection, duel");
+                    sender.sendMessage(ChatColor.RED + "Catégorie inconnue. Utilise : prison, head, deathsound, protection, duel, automessage");
                     return true;
             }
         } catch (NumberFormatException e) {
@@ -377,6 +386,47 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean handleSetAutoMessage(CommandSender sender, String key) {
+        switch (key) {
+            case "on":
+                autoMessageFeature.setEnabled(true);
+                sender.sendMessage(org.bukkit.ChatColor.GREEN + "AutoMessage activé.");
+                break;
+            case "off":
+                autoMessageFeature.setEnabled(false);
+                sender.sendMessage(org.bukkit.ChatColor.GREEN + "AutoMessage désactivé.");
+                break;
+            case "interval":
+                sender.sendMessage(org.bukkit.ChatColor.RED + "Usage : /db set automessage interval <minutes>");
+                break;
+            default:
+                if (key.isEmpty()) {
+                    String status = autoMessageFeature.isEnabled()
+                            ? org.bukkit.ChatColor.GREEN + "activé"
+                            : org.bukkit.ChatColor.RED + "désactivé";
+                    sender.sendMessage(org.bukkit.ChatColor.YELLOW + "AutoMessage est " + status
+                            + org.bukkit.ChatColor.YELLOW + ", intervalle : "
+                            + autoMessageFeature.getIntervalMinutes() + " min.");
+                    sender.sendMessage(org.bukkit.ChatColor.YELLOW + "Usage : /db set automessage on|off|interval <minutes>");
+                } else {
+                    // Cas /db set automessage <nombre> → raccourci pour interval
+                    try {
+                        int minutes = Integer.parseInt(key);
+                        if (minutes < 1) {
+                            sender.sendMessage(org.bukkit.ChatColor.RED + "L'intervalle doit être d'au moins 1 minute.");
+                            return true;
+                        }
+                        autoMessageFeature.setIntervalMinutes(minutes);
+                        sender.sendMessage(org.bukkit.ChatColor.GREEN + "Intervalle automessage = " + minutes + " min.");
+                    } catch (NumberFormatException e) {
+                        sender.sendMessage(org.bukkit.ChatColor.RED + "Clé inconnue. Utilise : on, off, interval <minutes>");
+                    }
+                }
+                return true;
+        }
+        return true;
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
@@ -414,6 +464,9 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                 case "duel":
                     completions.addAll(DUEL_GLOBAL_KEYS);
                     completions.addAll(DUEL_ZONES);
+                    break;
+                case "automessage":
+                    completions.addAll(AUTOMESSAGE_KEYS);
                     break;
             }
         } else if (args.length == 4 && args[0].equalsIgnoreCase("set")) {
