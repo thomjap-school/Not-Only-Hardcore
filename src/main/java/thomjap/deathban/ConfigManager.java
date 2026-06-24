@@ -43,6 +43,9 @@ public class ConfigManager {
         config.addDefault("new-player-protection.duration-minutes", 30);
         config.addDefault("new-player-protection.resistance-amplifier", 4);
 
+        config.addDefault("release-protection.duration-minutes", 5);
+        config.addDefault("release-protection.resistance-amplifier", 4);
+
         config.addDefault("duel.world", "duel");
         config.addDefault("duel.return-delay-seconds", 30);
         for (int zone = 1; zone <= 3; zone++) {
@@ -227,6 +230,26 @@ public class ConfigManager {
 
     public void setNewPlayerProtectionAmplifier(int amplifier) {
         config.set("new-player-protection.resistance-amplifier", amplifier);
+        save();
+    }
+
+    // ===================== RELEASE PROTECTION =====================
+
+    public int getReleaseProtectionDurationMinutes() {
+        return config.getInt("release-protection.duration-minutes");
+    }
+
+    public void setReleaseProtectionDurationMinutes(int minutes) {
+        config.set("release-protection.duration-minutes", minutes);
+        save();
+    }
+
+    public int getReleaseProtectionAmplifier() {
+        return config.getInt("release-protection.resistance-amplifier");
+    }
+
+    public void setReleaseProtectionAmplifier(int amplifier) {
+        config.set("release-protection.resistance-amplifier", amplifier);
         save();
     }
 
