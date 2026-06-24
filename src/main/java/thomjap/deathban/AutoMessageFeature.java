@@ -1,12 +1,14 @@
 package thomjap.deathban;
 
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 public class AutoMessageFeature {
 
@@ -17,11 +19,12 @@ public class AutoMessageFeature {
     private BukkitTask task;
     private boolean enabled;
     private int intervalMinutes;
+    private int currentIndex = 0;
 
     public AutoMessageFeature(DeathBan plugin) {
         this.plugin = plugin;
         setupMessageFile();
-        this.enabled = messageConfig.getBoolean("enabled", false);
+        this.enabled = messageConfig.getBoolean("enabled", true);
         this.intervalMinutes = messageConfig.getInt("interval-minutes", 5);
         if (enabled) startTask();
     }
@@ -34,11 +37,12 @@ public class AutoMessageFeature {
             plugin.getDataFolder().mkdirs();
             try {
                 messageFile.createNewFile();
-                // Crée le fichier avec des valeurs par défaut
                 FileConfiguration defaults = YamlConfiguration.loadConfiguration(messageFile);
-                defaults.set("enabled", false);
+                defaults.set("enabled", true);
                 defaults.set("interval-minutes", 5);
-                defaults.set("message", "&6[Serveur] &fBienvenue sur le serveur !");
+                defaults.set("messages", java.util.Arrays.asList(
+                        "&6[Serveur] &fBienvenue sur le serveur !"
+                ));
                 defaults.save(messageFile);
             } catch (IOException e) {
                 plugin.getLogger().severe("[AutoMessage] Impossible de créer automessage.yml : " + e.getMessage());
@@ -77,10 +81,18 @@ public class AutoMessageFeature {
     }
 
     private void broadcast() {
-        String raw = messageConfig.getString("message", "");
-        if (raw.isEmpty()) return;
-        String message = raw.replace("&", "\u00a7");
-        Bukkit.broadcastMessage(message);
+        List<String> messages = messageConfig.getStringList("messages");
+        if (messages == null || messages.isEmpty()) return;
+
+        // Rotation circulaire
+        if (currentIndex >= messages.size()) currentIndex = 0;
+        String raw = messages.get(currentIndex);
+        currentIndex = (currentIndex + 1) % messages.size();
+
+        // Supporte les \n pour les messages multi-lignes
+        for (String line : raw.split("\\\\n")) {
+            Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', line));
+        }
     }
 
     // ===================== API =====================
@@ -90,6 +102,7 @@ public class AutoMessageFeature {
         boolean wasEnabled = enabled;
         enabled = messageConfig.getBoolean("enabled", true);
         intervalMinutes = messageConfig.getInt("interval-minutes", 5);
+        currentIndex = 0;
 
         if (wasEnabled) stopTask();
         if (enabled) startTask();
@@ -118,6 +131,6 @@ public class AutoMessageFeature {
     public void setIntervalMinutes(int minutes) {
         this.intervalMinutes = minutes;
         save();
-        if (enabled) startTask(); // relance avec le nouvel intervalle
+        if (enabled) startTask();
     }
 }
