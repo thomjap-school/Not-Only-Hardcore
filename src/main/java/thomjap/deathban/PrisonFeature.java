@@ -203,7 +203,15 @@ public class PrisonFeature implements Listener {
         player.teleport(releaseLocation);
         releasing.remove(uuid);
 
-        player.sendMessage(ChatColor.GREEN + "Vous êtes libéré !");
+        player.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                org.bukkit.potion.PotionEffectType.RESISTANCE,
+                5 * 60 * 20, // 5 minutes en ticks
+                4,           // amplifier 4 = Résistance 5
+                false,
+                true
+        ));
+
+        player.sendMessage(ChatColor.GREEN + "Vous êtes libéré ! Vous bénéficiez de Résistance 5 pendant 5 minutes.");
         removePrisoner(uuid);
     }
 
