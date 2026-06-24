@@ -39,7 +39,10 @@ public class DeathBan extends JavaPlugin implements Listener {
         KitFeature kitFeature = new KitFeature(this);
         prisonFeature.setKitFeature(kitFeature);
 
-        DeathBanCommand deathBanCommand = new DeathBanCommand(configManager, prisonFeature, duelFeature, alexBanniereFeature, autoMessageFeature, kitFeature);
+        NickFeature nickFeature = new NickFeature();
+        Bukkit.getPluginManager().registerEvents(nickFeature, this);
+
+        DeathBanCommand deathBanCommand = new DeathBanCommand(configManager, prisonFeature, duelFeature, alexBanniereFeature, autoMessageFeature, kitFeature, nickFeature);
         getCommand("db").setExecutor(deathBanCommand);
         getCommand("db").setTabCompleter(deathBanCommand);
 
