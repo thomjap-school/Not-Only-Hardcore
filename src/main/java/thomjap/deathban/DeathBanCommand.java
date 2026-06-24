@@ -23,12 +23,13 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
     private final AutoMessageFeature autoMessageFeature;
 
     private static final List<String> SUBCOMMANDS = Arrays.asList("unprison", "set", "reload", "duel", "alexbanniere");
-    private static final List<String> SET_CATEGORIES = Arrays.asList("prison", "head", "deathsound", "protection", "duel", "automessage");
+    private static final List<String> SET_CATEGORIES = Arrays.asList("prison", "head", "deathsound", "protection", "duel", "automessage", "releaseprotection");
 
     private static final List<String> PRISON_KEYS = Arrays.asList("x", "y", "z", "world", "yaw", "pitch", "duration");
     private static final List<String> HEAD_KEYS = Arrays.asList("effect", "duration", "amplifier", "drop");
     private static final List<String> DEATHSOUND_KEYS = Arrays.asList("sound", "volume", "pitch");
     private static final List<String> PROTECTION_KEYS = Arrays.asList("duration", "amplifier");
+    private static final List<String> RELEASE_PROTECTION_KEYS = Arrays.asList("duration", "amplifier");
     private static final List<String> DUEL_AXES = Arrays.asList("x", "y", "z", "yaw", "pitch");
     private static final List<String> DUEL_ZONES = Arrays.asList("1", "2", "3");
     private static final List<String> DUEL_SLOTS = Arrays.asList("a", "b");
@@ -89,6 +90,7 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ChatColor.YELLOW + "/db set head <effect|duration|amplifier|drop> <valeur>");
         sender.sendMessage(ChatColor.YELLOW + "/db set deathsound <sound|volume|pitch> <valeur>");
         sender.sendMessage(ChatColor.YELLOW + "/db set protection <duration|amplifier> <valeur>");
+        sender.sendMessage(ChatColor.YELLOW + "/db set releaseprotection <duration|amplifier> <valeur>");
         sender.sendMessage(ChatColor.YELLOW + "/db set duel world <nom>");
         sender.sendMessage(ChatColor.YELLOW + "/db set duel delay <secondes>");
         sender.sendMessage(ChatColor.YELLOW + "/db set duel <1|2|3> <a|b> <x|y|z|yaw|pitch> <valeur>");
@@ -212,6 +214,8 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                     return handleSetDeathSound(sender, key, value);
                 case "protection":
                     return handleSetProtection(sender, key, value);
+                case "releaseprotection":
+                    return handleSetReleaseProtection(sender, key, value);
                 default:
                     sender.sendMessage(ChatColor.RED + "Catégorie inconnue. Utilise : prison, head, deathsound, protection, duel, automessage");
                     return true;
@@ -389,6 +393,22 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean handleSetReleaseProtection(CommandSender sender, String key, String value) {
+        switch (key) {
+            case "duration":
+                configManager.setReleaseProtectionDurationMinutes(Integer.parseInt(value));
+                break;
+            case "amplifier":
+                configManager.setReleaseProtectionAmplifier(Integer.parseInt(value));
+                break;
+            default:
+                sender.sendMessage(ChatColor.RED + "Clé inconnue pour 'releaseprotection'. Utilise : duration, amplifier");
+                return true;
+        }
+        sender.sendMessage(ChatColor.GREEN + "releaseprotection." + key + " = " + value);
+        return true;
+    }
+
     private boolean handleSetAutoMessage(CommandSender sender, String[] args) {
         // args : [0]=set [1]=automessage [2]=clé [3]=valeur(optionnel)
         if (args.length < 3) {
@@ -481,6 +501,9 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                     break;
                 case "protection":
                     completions.addAll(PROTECTION_KEYS);
+                    break;
+                case "releaseprotection":
+                    completions.addAll(RELEASE_PROTECTION_KEYS);
                     break;
                 case "duel":
                     completions.addAll(DUEL_GLOBAL_KEYS);
