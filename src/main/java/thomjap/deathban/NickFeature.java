@@ -1,5 +1,6 @@
 package thomjap.deathban;
 
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -7,6 +8,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -14,16 +17,13 @@ import java.util.UUID;
 
 public class NickFeature implements Listener {
 
-    // Nick en mémoire uniquement (pas de persistance)
     private final Map<UUID, String> nicks = new HashMap<>();
 
     public void setNick(Player player, String nick) {
         String colored = ChatColor.translateAlternateColorCodes('&', nick);
         nicks.put(player.getUniqueId(), colored);
 
-        // Nom au-dessus de la tête + tab
-        player.setCustomName(colored);
-        player.setCustomNameVisible(true);
+        applyNickToScoreboard(player, colored);
         player.setDisplayName(colored);
         player.setPlayerListName(colored);
 
@@ -33,8 +33,7 @@ public class NickFeature implements Listener {
     public void resetNick(Player player) {
         nicks.remove(player.getUniqueId());
 
-        player.setCustomName(null);
-        player.setCustomNameVisible(false);
+        removeFromNickTeam(player);
         player.setDisplayName(player.getName());
         player.setPlayerListName(player.getName());
 
@@ -45,20 +44,52 @@ public class NickFeature implements Listener {
         return nicks.containsKey(uuid);
     }
 
-    // Nettoie à la déconnexion (pas de persistance)
-    @EventHandler
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        nicks.remove(event.getPlayer().getUniqueId());
+    private void applyNickToScoreboard(Player player, String colored) {
+        Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
+        String teamName = "nick_" + player.getUniqueId().toString().substring(0, 16);
+
+        removeFromNickTeam(player);
+
+        Team team = board.registerNewTeam(teamName);
+        // Prefix = nick, le nom vanilla est "écrasé" en le mettant dans le suffix vide
+        // Minecraft affiche : [prefix][nom joueur][suffix]
+        // On met le nick en prefix et on cache le nom avec un caractère obfusqué invisible
+        team.setPrefix(colored + ChatColor.RESET);
+        team.setSuffix("");
+        // L'astuce : on override le nom affiché via setColor qui pousse le nom à droite
+        team.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.NEVER);
+        team.addEntry(player.getName());
+
+        // On affiche notre propre custom name à la place
+        player.setCustomName(colored);
+        player.setCustomNameVisible(true);
     }
 
-    // Restaure le nick si le joueur se reconnecte dans la même session (edge case)
+    private void removeFromNickTeam(Player player) {
+        Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
+        String teamName = "nick_" + player.getUniqueId().toString().substring(0, 16);
+        Team team = board.getTeam(teamName);
+        if (team != null) {
+            team.removeEntry(player.getName());
+            team.unregister();
+        }
+        player.setCustomName(null);
+        player.setCustomNameVisible(false);
+    }
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        Player player = event.getPlayer();
+        removeFromNickTeam(player);
+        nicks.remove(player.getUniqueId());
+    }
+
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         String nick = nicks.get(player.getUniqueId());
         if (nick != null) {
-            player.setCustomName(nick);
-            player.setCustomNameVisible(true);
+            applyNickToScoreboard(player, nick);
             player.setDisplayName(nick);
             player.setPlayerListName(nick);
         }
@@ -69,9 +100,7 @@ public class NickFeature implements Listener {
         Player player = event.getPlayer();
         String nick = nicks.get(player.getUniqueId());
         if (nick != null) {
-            event.setFormat(nick + " &r» %2$s");
-            // Applique les couleurs dans le format
-            event.setFormat(ChatColor.translateAlternateColorCodes('&', event.getFormat()));
+            event.setFormat(nick + ChatColor.RESET + " » %2$s");
         }
     }
 }
