@@ -122,6 +122,11 @@ public class DuelFeature implements Listener {
         this.prisonFeature = prisonFeature;
     }
 
+    public void reload() {
+        forfeitConfig = YamlConfiguration.loadConfiguration(forfeitFile);
+        plugin.getLogger().info("[Duel] Configuration rechargée depuis pending_forfeits.yml.");
+    }
+
     // ===================== REQUÊTES =====================
 
     public void sendRequest(Player requester, Player target) {

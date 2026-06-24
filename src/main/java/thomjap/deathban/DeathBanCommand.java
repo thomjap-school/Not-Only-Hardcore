@@ -69,7 +69,10 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                 return handleSet(sender, args);
             case "reload":
                 configManager.reload();
-                sender.sendMessage(ChatColor.GREEN + "Configuration rechargée.");
+                prisonFeature.reload();
+                duelFeature.reload();
+                autoMessageFeature.reload();
+                sender.sendMessage(ChatColor.GREEN + "Configuration rechargée (config.yml, prisoners.yml, pending_forfeits.yml, automessage.yml).");
                 return true;
             case "alexbanniere":
                 return handleAlexBanniere(sender, args);

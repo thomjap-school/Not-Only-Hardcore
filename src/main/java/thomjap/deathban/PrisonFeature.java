@@ -100,6 +100,11 @@ public class PrisonFeature implements Listener {
         prisoners.remove(uuid);
     }
 
+    public void reload() {
+        dataConfig = YamlConfiguration.loadConfiguration(dataFile);
+        plugin.getLogger().info("[Prison] Configuration rechargée depuis prisoners.yml.");
+    }
+
     public void imprison(Player player) {
         UUID uuid = player.getUniqueId();
         if (prisoners.containsKey(uuid)) return;
