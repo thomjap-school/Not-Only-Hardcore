@@ -189,7 +189,7 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
             }
 
             if (category.equals("automessage")) {
-                return handleSetAutoMessage(sender, args.length >= 3 ? args[2].toLowerCase() : "");
+                return handleSetAutoMessage(sender, args);
             }
 
             if (args.length < 4) {
@@ -386,43 +386,61 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    private boolean handleSetAutoMessage(CommandSender sender, String key) {
+    private boolean handleSetAutoMessage(CommandSender sender, String[] args) {
+        // args : [0]=set [1]=automessage [2]=clé [3]=valeur(optionnel)
+        if (args.length < 3) {
+            String status = autoMessageFeature.isEnabled()
+                    ? ChatColor.GREEN + "activé"
+                    : ChatColor.RED + "désactivé";
+            sender.sendMessage(ChatColor.YELLOW + "AutoMessage est " + status
+                    + ChatColor.YELLOW + ", intervalle : "
+                    + autoMessageFeature.getIntervalMinutes() + " min.");
+            sender.sendMessage(ChatColor.YELLOW + "Usage : /db set automessage on|off|interval <minutes>");
+            return true;
+        }
+
+        String key = args[2].toLowerCase();
+
         switch (key) {
             case "on":
                 autoMessageFeature.setEnabled(true);
-                sender.sendMessage(org.bukkit.ChatColor.GREEN + "AutoMessage activé.");
+                sender.sendMessage(ChatColor.GREEN + "AutoMessage activé.");
                 break;
             case "off":
                 autoMessageFeature.setEnabled(false);
-                sender.sendMessage(org.bukkit.ChatColor.GREEN + "AutoMessage désactivé.");
+                sender.sendMessage(ChatColor.GREEN + "AutoMessage désactivé.");
                 break;
             case "interval":
-                sender.sendMessage(org.bukkit.ChatColor.RED + "Usage : /db set automessage interval <minutes>");
+                if (args.length < 4) {
+                    sender.sendMessage(ChatColor.RED + "Usage : /db set automessage interval <minutes>");
+                    return true;
+                }
+                try {
+                    int minutes = Integer.parseInt(args[3]);
+                    if (minutes < 1) {
+                        sender.sendMessage(ChatColor.RED + "L'intervalle doit être d'au moins 1 minute.");
+                        return true;
+                    }
+                    autoMessageFeature.setIntervalMinutes(minutes);
+                    sender.sendMessage(ChatColor.GREEN + "Intervalle automessage = " + minutes + " min.");
+                } catch (NumberFormatException e) {
+                    sender.sendMessage(ChatColor.RED + "Valeur invalide : ce n'est pas un nombre.");
+                }
                 break;
             default:
-                if (key.isEmpty()) {
-                    String status = autoMessageFeature.isEnabled()
-                            ? org.bukkit.ChatColor.GREEN + "activé"
-                            : org.bukkit.ChatColor.RED + "désactivé";
-                    sender.sendMessage(org.bukkit.ChatColor.YELLOW + "AutoMessage est " + status
-                            + org.bukkit.ChatColor.YELLOW + ", intervalle : "
-                            + autoMessageFeature.getIntervalMinutes() + " min.");
-                    sender.sendMessage(org.bukkit.ChatColor.YELLOW + "Usage : /db set automessage on|off|interval <minutes>");
-                } else {
-                    // Cas /db set automessage <nombre> → raccourci pour interval
-                    try {
-                        int minutes = Integer.parseInt(key);
-                        if (minutes < 1) {
-                            sender.sendMessage(org.bukkit.ChatColor.RED + "L'intervalle doit être d'au moins 1 minute.");
-                            return true;
-                        }
-                        autoMessageFeature.setIntervalMinutes(minutes);
-                        sender.sendMessage(org.bukkit.ChatColor.GREEN + "Intervalle automessage = " + minutes + " min.");
-                    } catch (NumberFormatException e) {
-                        sender.sendMessage(org.bukkit.ChatColor.RED + "Clé inconnue. Utilise : on, off, interval <minutes>");
+                // Raccourci : /db set automessage <nombre>
+                try {
+                    int minutes = Integer.parseInt(key);
+                    if (minutes < 1) {
+                        sender.sendMessage(ChatColor.RED + "L'intervalle doit être d'au moins 1 minute.");
+                        return true;
                     }
+                    autoMessageFeature.setIntervalMinutes(minutes);
+                    sender.sendMessage(ChatColor.GREEN + "Intervalle automessage = " + minutes + " min.");
+                } catch (NumberFormatException e) {
+                    sender.sendMessage(ChatColor.RED + "Clé inconnue. Utilise : on, off, interval <minutes>");
                 }
-                return true;
+                break;
         }
         return true;
     }
@@ -469,6 +487,10 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                     completions.addAll(AUTOMESSAGE_KEYS);
                     break;
             }
+        } else if (args.length == 4 && args[0].equalsIgnoreCase("set")
+                && args[1].equalsIgnoreCase("automessage")
+                && args[2].equalsIgnoreCase("interval")) {
+            completions.add("<minutes>");
         } else if (args.length == 4 && args[0].equalsIgnoreCase("set")) {
             if (args[1].equalsIgnoreCase("head") && args[2].equalsIgnoreCase("effect")) {
                 return Arrays.stream(PotionEffectType.values())

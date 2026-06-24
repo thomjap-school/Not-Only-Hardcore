@@ -21,7 +21,7 @@ public class AutoMessageFeature {
     public AutoMessageFeature(DeathBan plugin) {
         this.plugin = plugin;
         setupMessageFile();
-        this.enabled = messageConfig.getBoolean("enabled", false);
+        this.enabled = messageConfig.getBoolean("enabled", true);
         this.intervalMinutes = messageConfig.getInt("interval-minutes", 5);
         if (enabled) startTask();
     }
@@ -36,7 +36,7 @@ public class AutoMessageFeature {
                 messageFile.createNewFile();
                 // Crée le fichier avec des valeurs par défaut
                 FileConfiguration defaults = YamlConfiguration.loadConfiguration(messageFile);
-                defaults.set("enabled", false);
+                defaults.set("enabled", true);
                 defaults.set("interval-minutes", 5);
                 defaults.set("message", "&6[Serveur] &fBienvenue sur le serveur !");
                 defaults.save(messageFile);
