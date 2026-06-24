@@ -19,8 +19,9 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
     private final ConfigManager configManager;
     private final PrisonFeature prisonFeature;
     private final DuelFeature duelFeature;
+    private final AlexBanniereFeature alexBanniereFeature;
 
-    private static final List<String> SUBCOMMANDS = Arrays.asList("unprison", "set", "reload", "duel");
+    private static final List<String> SUBCOMMANDS = Arrays.asList("unprison", "set", "reload", "duel", "alexbanniere");
     private static final List<String> SET_CATEGORIES = Arrays.asList("prison", "head", "deathsound", "protection", "duel");
 
     private static final List<String> PRISON_KEYS = Arrays.asList("x", "y", "z", "world", "yaw", "pitch", "duration");
@@ -32,10 +33,11 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
     private static final List<String> DUEL_SLOTS = Arrays.asList("a", "b");
     private static final List<String> DUEL_GLOBAL_KEYS = Arrays.asList("world", "delay");
 
-    public DeathBanCommand(ConfigManager configManager, PrisonFeature prisonFeature, DuelFeature duelFeature) {
+    public DeathBanCommand(ConfigManager configManager, PrisonFeature prisonFeature, DuelFeature duelFeature, AlexBanniereFeature alexBanniereFeature) {
         this.configManager = configManager;
         this.prisonFeature = prisonFeature;
         this.duelFeature = duelFeature;
+        this.alexBanniereFeature = alexBanniereFeature;
     }
 
     @Override
@@ -66,6 +68,8 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                 configManager.reload();
                 sender.sendMessage(ChatColor.GREEN + "Configuration rechargée.");
                 return true;
+            case "alexbanniere":
+                return handleAlexBanniere(sender, args);
             default:
                 sendHelp(sender);
                 return true;
@@ -84,7 +88,31 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ChatColor.YELLOW + "/db set duel <1|2|3> <a|b> <x|y|z|yaw|pitch> <valeur>");
         sender.sendMessage(ChatColor.YELLOW + "/db duel <joueur>");
         sender.sendMessage(ChatColor.YELLOW + "/db duel accept|deny <joueur>");
+        sender.sendMessage(ChatColor.YELLOW + "/db alexbanniere on|off");
         sender.sendMessage(ChatColor.YELLOW + "/db reload");
+    }
+
+    private boolean handleAlexBanniere(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            String status = alexBanniereFeature.isEnabled() ? ChatColor.GREEN + "activé" : ChatColor.RED + "désactivé";
+            sender.sendMessage(ChatColor.YELLOW + "AlexBanniere est actuellement " + status + ChatColor.YELLOW + ".");
+            sender.sendMessage(ChatColor.YELLOW + "Usage : /db alexbanniere on|off");
+            return true;
+        }
+
+        switch (args[1].toLowerCase()) {
+            case "on":
+                alexBanniereFeature.setEnabled(true);
+                sender.sendMessage(ChatColor.GREEN + "AlexBanniere activé : AlexJanOne ne peut plus avoir de bannières.");
+                break;
+            case "off":
+                alexBanniereFeature.setEnabled(false);
+                sender.sendMessage(ChatColor.GREEN + "AlexBanniere désactivé.");
+                break;
+            default:
+                sender.sendMessage(ChatColor.RED + "Usage : /db alexbanniere on|off");
+        }
+        return true;
     }
 
     private boolean handleUnprison(CommandSender sender, String[] args) {
@@ -363,6 +391,8 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
             } else if (args[0].equalsIgnoreCase("duel")) {
                 completions.addAll(Arrays.asList("accept", "deny"));
                 Bukkit.getOnlinePlayers().forEach(p -> completions.add(p.getName()));
+            } else if (args[0].equalsIgnoreCase("alexbanniere")) {
+                completions.addAll(Arrays.asList("on", "off"));
             }
         } else if (args.length == 3 && args[0].equalsIgnoreCase("duel")
                 && (args[1].equalsIgnoreCase("accept") || args[1].equalsIgnoreCase("deny"))) {
