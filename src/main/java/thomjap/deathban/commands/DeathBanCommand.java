@@ -1,4 +1,13 @@
-package thomjap.deathban;
+package thomjap.deathban.commands;
+
+import thomjap.deathban.AlexBanniereFeature;
+import thomjap.deathban.AutoMessageFeature;
+import thomjap.deathban.CombatLogFeature;
+import thomjap.deathban.ConfigManager;
+import thomjap.deathban.DuelFeature;
+import thomjap.deathban.KitFeature;
+import thomjap.deathban.NickFeature;
+import thomjap.deathban.PrisonFeature;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -23,6 +32,7 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
     private final AutoMessageFeature autoMessageFeature;
     private final KitFeature kitFeature;
     private final NickFeature nickFeature;
+    private final CombatLogFeature combatLogFeature;
 
     private static final List<String> SUBCOMMANDS = Arrays.asList("unprison", "set", "reload", "duel", "alexbanniere", "kit", "nick");
     private static final List<String> SET_CATEGORIES = Arrays.asList("prison", "head", "deathsound", "protection", "duel", "automessage", "releaseprotection");
@@ -38,7 +48,7 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
     private static final List<String> DUEL_GLOBAL_KEYS = Arrays.asList("world", "delay");
     private static final List<String> AUTOMESSAGE_KEYS = Arrays.asList("on", "off", "interval");
 
-    public DeathBanCommand(ConfigManager configManager, PrisonFeature prisonFeature, DuelFeature duelFeature, AlexBanniereFeature alexBanniereFeature, AutoMessageFeature autoMessageFeature, KitFeature kitFeature, NickFeature nickFeature) {
+    public DeathBanCommand(ConfigManager configManager, PrisonFeature prisonFeature, DuelFeature duelFeature, AlexBanniereFeature alexBanniereFeature, AutoMessageFeature autoMessageFeature, KitFeature kitFeature, NickFeature nickFeature, CombatLogFeature combatLogFeature) {
         this.configManager = configManager;
         this.prisonFeature = prisonFeature;
         this.duelFeature = duelFeature;
@@ -46,6 +56,7 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
         this.autoMessageFeature = autoMessageFeature;
         this.kitFeature = kitFeature;
         this.nickFeature = nickFeature;
+        this.combatLogFeature = combatLogFeature;
     }
 
     @Override
@@ -91,7 +102,8 @@ public class DeathBanCommand implements CommandExecutor, TabCompleter {
                 duelFeature.reload();
                 autoMessageFeature.reload();
                 kitFeature.reload();
-                sender.sendMessage(ChatColor.GREEN + "Configuration rechargée (config.yml, prisoners.yml, pending_forfeits.yml, automessage.yml, kit.yml).");
+                combatLogFeature.reload();
+                sender.sendMessage(ChatColor.GREEN + "Configuration rechargée (config.yml, prisoners.yml, pending_forfeits.yml, automessage.yml, kit.yml, pending_combatlog.yml).");
                 return true;
             case "alexbanniere":
                 return handleAlexBanniere(sender, args);

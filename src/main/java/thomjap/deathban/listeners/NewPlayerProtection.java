@@ -1,4 +1,7 @@
-package thomjap.deathban;
+package thomjap.deathban.listeners;
+
+import thomjap.deathban.ConfigManager;
+import thomjap.deathban.DeathBan;
 
 import org.bukkit.ChatColor;
 import org.bukkit.NamespacedKey;

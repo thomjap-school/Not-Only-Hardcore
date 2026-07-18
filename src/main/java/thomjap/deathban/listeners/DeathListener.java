@@ -1,4 +1,7 @@
-package thomjap.deathban;
+package thomjap.deathban.listeners;
+
+import thomjap.deathban.ConfigManager;
+import thomjap.deathban.PrisonFeature;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;

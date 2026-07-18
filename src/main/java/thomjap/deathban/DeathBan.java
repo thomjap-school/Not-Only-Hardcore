@@ -1,5 +1,9 @@
 package thomjap.deathban;
 
+import thomjap.deathban.commands.DeathBanCommand;
+import thomjap.deathban.listeners.DeathListener;
+import thomjap.deathban.listeners.NewPlayerProtection;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -28,6 +32,9 @@ public class DeathBan extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(new HeadFeature(this, configManager, duelFeature), this);
         Bukkit.getPluginManager().registerEvents(new NewPlayerProtection(this, configManager), this);
 
+        CombatLogFeature combatLogFeature = new CombatLogFeature(this, duelFeature);
+        Bukkit.getPluginManager().registerEvents(combatLogFeature, this);
+
         prisonFeature = new PrisonFeature(this, configManager);
         Bukkit.getPluginManager().registerEvents(prisonFeature, this);
         duelFeature.setPrisonFeature(prisonFeature);
@@ -42,7 +49,7 @@ public class DeathBan extends JavaPlugin implements Listener {
         NickFeature nickFeature = new NickFeature();
         Bukkit.getPluginManager().registerEvents(nickFeature, this);
 
-        DeathBanCommand deathBanCommand = new DeathBanCommand(configManager, prisonFeature, duelFeature, alexBanniereFeature, autoMessageFeature, kitFeature, nickFeature);
+        DeathBanCommand deathBanCommand = new DeathBanCommand(configManager, prisonFeature, duelFeature, alexBanniereFeature, autoMessageFeature, kitFeature, nickFeature, combatLogFeature);
         getCommand("db").setExecutor(deathBanCommand);
         getCommand("db").setTabCompleter(deathBanCommand);
 

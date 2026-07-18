@@ -1,4 +1,6 @@
-package thomjap.deathban;
+package thomjap.deathban.commands;
+
+import thomjap.deathban.PrisonFeature;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
