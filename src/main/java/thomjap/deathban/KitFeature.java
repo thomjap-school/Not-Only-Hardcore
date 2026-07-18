@@ -1,22 +1,22 @@
 package thomjap.deathban;
 
+import thomjap.deathban.util.YamlFiles;
+
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
 public class KitFeature {
 
+    private static final String FILE_NAME = "kit.yml";
+
     private final DeathBan plugin;
-    private File kitFile;
     private FileConfiguration kitConfig;
 
     // Joueurs ayant déjà récupéré le kit depuis leur dernière mort/libération
@@ -24,38 +24,22 @@ public class KitFeature {
 
     public KitFeature(DeathBan plugin) {
         this.plugin = plugin;
-        setupKitFile();
+        kitConfig = YamlFiles.loadOrCreate(plugin, FILE_NAME, defaults -> {
+            // Kit par défaut : quelques items de base
+            defaults.set("items.0.material", "STONE_SWORD");
+            defaults.set("items.0.amount", 1);
+            defaults.set("items.1.material", "BREAD");
+            defaults.set("items.1.amount", 16);
+            defaults.set("items.2.material", "OAK_LOG");
+            defaults.set("items.2.amount", 32);
+            plugin.getLogger().info("[Kit] kit.yml créé avec des items par défaut.");
+        });
     }
 
     // ===================== FICHIER YML =====================
 
-    private void setupKitFile() {
-        kitFile = new File(plugin.getDataFolder(), "kit.yml");
-        if (!kitFile.exists()) {
-            plugin.getDataFolder().mkdirs();
-            try {
-                kitFile.createNewFile();
-                FileConfiguration defaults = YamlConfiguration.loadConfiguration(kitFile);
-
-                // Kit par défaut : quelques items de base
-                defaults.set("items.0.material", "STONE_SWORD");
-                defaults.set("items.0.amount", 1);
-                defaults.set("items.1.material", "BREAD");
-                defaults.set("items.1.amount", 16);
-                defaults.set("items.2.material", "OAK_LOG");
-                defaults.set("items.2.amount", 32);
-
-                defaults.save(kitFile);
-                plugin.getLogger().info("[Kit] kit.yml créé avec des items par défaut.");
-            } catch (IOException e) {
-                plugin.getLogger().severe("[Kit] Impossible de créer kit.yml : " + e.getMessage());
-            }
-        }
-        kitConfig = YamlConfiguration.loadConfiguration(kitFile);
-    }
-
     public void reload() {
-        kitConfig = YamlConfiguration.loadConfiguration(kitFile);
+        kitConfig = YamlFiles.loadOrCreate(plugin, FILE_NAME);
         plugin.getLogger().info("[Kit] Configuration rechargée depuis kit.yml.");
     }
 

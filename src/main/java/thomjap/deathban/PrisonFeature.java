@@ -1,11 +1,12 @@
 package thomjap.deathban;
 
+import thomjap.deathban.util.YamlFiles;
+
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -14,49 +15,31 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.event.player.PlayerRespawnEvent;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 public class PrisonFeature implements Listener {
 
+    private static final String FILE_NAME = "prisoners.yml";
+
     private final DeathBan plugin;
     private final ConfigManager configManager;
     private KitFeature kitFeature;
     private final Map<UUID, PrisonData> prisoners = new HashMap<>();
     private final java.util.Set<UUID> releasing = new java.util.HashSet<>();
-    private File dataFile;
     private FileConfiguration dataConfig;
 
     public PrisonFeature(DeathBan plugin, ConfigManager configManager) {
         this.plugin = plugin;
         this.configManager = configManager;
-        setupDataFile();
+        dataConfig = YamlFiles.loadOrCreate(plugin, FILE_NAME);
         loadPrisoners();
         startReleaseChecker();
     }
 
-    private void setupDataFile() {
-        dataFile = new File(plugin.getDataFolder(), "prisoners.yml");
-        if (!dataFile.exists()) {
-            plugin.getDataFolder().mkdirs();
-            try {
-                dataFile.createNewFile();
-            } catch (IOException e) {
-                plugin.getLogger().severe("Impossible de créer prisoners.yml : " + e.getMessage());
-            }
-        }
-        dataConfig = YamlConfiguration.loadConfiguration(dataFile);
-    }
-
     private void saveData() {
-        try {
-            dataConfig.save(dataFile);
-        } catch (IOException e) {
-            plugin.getLogger().severe("Impossible de sauvegarder prisoners.yml : " + e.getMessage());
-        }
+        YamlFiles.save(plugin, dataConfig, FILE_NAME);
     }
 
     private void loadPrisoners() {
@@ -106,7 +89,7 @@ public class PrisonFeature implements Listener {
     }
 
     public void reload() {
-        dataConfig = YamlConfiguration.loadConfiguration(dataFile);
+        dataConfig = YamlFiles.loadOrCreate(plugin, FILE_NAME);
         plugin.getLogger().info("[Prison] Configuration rechargée depuis prisoners.yml.");
     }
 

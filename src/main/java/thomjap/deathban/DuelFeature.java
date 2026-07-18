@@ -1,11 +1,13 @@
 package thomjap.deathban;
 
+import thomjap.deathban.util.InventorySnapshot;
+import thomjap.deathban.util.InventoryUtil;
+import thomjap.deathban.util.PendingUuidSet;
+
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -14,12 +16,8 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -43,13 +41,11 @@ public class DuelFeature implements Listener {
     private final Map<UUID, BukkitTask> disconnectGraceTasks = new HashMap<>();
 
     // Snapshot (position + inventaire) capturé à la déconnexion, utilisé en cas de forfait
-    private final Map<UUID, DisconnectSnapshot> disconnectSnapshots = new HashMap<>();
+    private final Map<UUID, InventorySnapshot> disconnectSnapshots = new HashMap<>();
 
     // Joueurs ayant perdu par forfait, à punir (drop déjà fait, emprisonnement) dès leur prochaine connexion.
     // Persisté sur disque pour survivre à un crash/redémarrage du serveur entre le forfait et la reconnexion.
-    private final java.util.Set<UUID> pendingForfeitPunishment = new java.util.HashSet<>();
-    private File forfeitFile;
-    private FileConfiguration forfeitConfig;
+    private final PendingUuidSet pendingForfeitPunishment;
 
     // Gagnants en attente de leur téléportation de retour (entre la fin du duel et le délai écoulé).
     // Sert à bloquer toute téléportation parasite (ex: perle d'ender lancée juste avant la fin du duel)
@@ -59,59 +55,11 @@ public class DuelFeature implements Listener {
     public DuelFeature(DeathBan plugin, ConfigManager configManager) {
         this.plugin = plugin;
         this.configManager = configManager;
-        setupForfeitFile();
-        loadPendingForfeits();
-    }
-
-    private void setupForfeitFile() {
-        forfeitFile = new File(plugin.getDataFolder(), "pending_forfeits.yml");
-        if (!forfeitFile.exists()) {
-            plugin.getDataFolder().mkdirs();
-            try {
-                forfeitFile.createNewFile();
-            } catch (IOException e) {
-                plugin.getLogger().severe("[Duel] Impossible de créer pending_forfeits.yml : " + e.getMessage());
-            }
-        }
-        forfeitConfig = YamlConfiguration.loadConfiguration(forfeitFile);
-    }
-
-    private void loadPendingForfeits() {
-        java.util.List<String> uuids = forfeitConfig.getStringList("pending");
-        for (String s : uuids) {
-            try {
-                pendingForfeitPunishment.add(UUID.fromString(s));
-            } catch (IllegalArgumentException ignored) {
-                // entrée corrompue, on l'ignore
-            }
-        }
-        if (!pendingForfeitPunishment.isEmpty()) {
+        this.pendingForfeitPunishment = new PendingUuidSet(plugin, "pending_forfeits.yml");
+        if (pendingForfeitPunishment.size() > 0) {
             plugin.getLogger().info("[Duel] " + pendingForfeitPunishment.size()
                     + " forfait(s) en attente chargé(s) depuis le fichier.");
         }
-    }
-
-    private void saveForfeitFile() {
-        java.util.List<String> uuids = new java.util.ArrayList<>();
-        for (UUID uuid : pendingForfeitPunishment) {
-            uuids.add(uuid.toString());
-        }
-        forfeitConfig.set("pending", uuids);
-        try {
-            forfeitConfig.save(forfeitFile);
-        } catch (IOException e) {
-            plugin.getLogger().severe("[Duel] Impossible de sauvegarder pending_forfeits.yml : " + e.getMessage());
-        }
-    }
-
-    private void addPendingForfeit(UUID uuid) {
-        pendingForfeitPunishment.add(uuid);
-        saveForfeitFile();
-    }
-
-    private void removePendingForfeit(UUID uuid) {
-        pendingForfeitPunishment.remove(uuid);
-        saveForfeitFile();
     }
 
     /**
@@ -123,7 +71,7 @@ public class DuelFeature implements Listener {
     }
 
     public void reload() {
-        forfeitConfig = YamlConfiguration.loadConfiguration(forfeitFile);
+        pendingForfeitPunishment.reload();
         plugin.getLogger().info("[Duel] Configuration rechargée depuis pending_forfeits.yml.");
     }
 
@@ -388,36 +336,14 @@ public class DuelFeature implements Listener {
 
         UUID disconnectedUuid = player.getUniqueId();
 
-        scheduleForfeitTask(disconnectedUuid, captureSnapshot(player));
-    }
-
-    /**
-     * Capture la position et le contenu de l'inventaire du joueur au moment de sa déconnexion,
-     * pour pouvoir faire dropper ses items au bon endroit si le forfait se confirme.
-     */
-    private DisconnectSnapshot captureSnapshot(Player player) {
-        PlayerInventory inv = player.getInventory();
-
-        java.util.List<ItemStack> items = new java.util.ArrayList<>();
-        for (ItemStack item : inv.getContents()) {
-            if (item != null && item.getType() != org.bukkit.Material.AIR) {
-                items.add(item.clone());
-            }
-        }
-        if (inv.getHelmet() != null && inv.getHelmet().getType() != org.bukkit.Material.AIR) items.add(inv.getHelmet().clone());
-        if (inv.getChestplate() != null && inv.getChestplate().getType() != org.bukkit.Material.AIR) items.add(inv.getChestplate().clone());
-        if (inv.getLeggings() != null && inv.getLeggings().getType() != org.bukkit.Material.AIR) items.add(inv.getLeggings().clone());
-        if (inv.getBoots() != null && inv.getBoots().getType() != org.bukkit.Material.AIR) items.add(inv.getBoots().clone());
-        if (inv.getItemInOffHand().getType() != org.bukkit.Material.AIR) items.add(inv.getItemInOffHand().clone());
-
-        return new DisconnectSnapshot(player.getLocation().clone(), items);
+        scheduleForfeitTask(disconnectedUuid, InventorySnapshot.capture(player));
     }
 
     /**
      * Programme (ou reprogramme) la tâche de forfait à 5 minutes pour un joueur déconnecté en duel.
      * Le snapshot fourni sera utilisé pour dropper ses items si le forfait se confirme.
      */
-    private void scheduleForfeitTask(UUID disconnectedUuid, DisconnectSnapshot snapshot) {
+    private void scheduleForfeitTask(UUID disconnectedUuid, InventorySnapshot snapshot) {
         disconnectSnapshots.put(disconnectedUuid, snapshot);
 
         BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -436,18 +362,12 @@ public class DuelFeature implements Listener {
             disconnectGraceTasks.remove(disconnectedUuid);
 
             // Drop des items du perdant à l'endroit où il s'est déconnecté
-            DisconnectSnapshot loserSnapshot = disconnectSnapshots.remove(disconnectedUuid);
+            InventorySnapshot loserSnapshot = disconnectSnapshots.remove(disconnectedUuid);
             if (loserSnapshot != null) {
-                Location dropLocation = loserSnapshot.location;
-                World dropWorld = dropLocation.getWorld();
-                if (dropWorld != null) {
-                    for (ItemStack item : loserSnapshot.items) {
-                        dropWorld.dropItemNaturally(dropLocation, item);
-                    }
-                }
+                loserSnapshot.dropItems();
             }
             // Le joueur sera vidé et emprisonné dès sa prochaine connexion (persisté sur disque)
-            addPendingForfeit(disconnectedUuid);
+            pendingForfeitPunishment.add(disconnectedUuid);
 
             if (winner != null && winner.isOnline()) {
                 Location returnLocation = stillActive.getReturnLocation(winnerUuid);
@@ -472,14 +392,9 @@ public class DuelFeature implements Listener {
 
         // Cas 1 : le joueur revient après que son forfait a déjà été acté (items déjà droppés)
         if (pendingForfeitPunishment.contains(uuid)) {
-            removePendingForfeit(uuid);
+            pendingForfeitPunishment.remove(uuid);
             Bukkit.getScheduler().runTask(plugin, () -> {
-                player.getInventory().clear();
-                player.getInventory().setHelmet(null);
-                player.getInventory().setChestplate(null);
-                player.getInventory().setLeggings(null);
-                player.getInventory().setBoots(null);
-                player.getInventory().setItemInOffHand(null);
+                InventoryUtil.clearFully(player);
 
                 player.sendMessage(ChatColor.RED + "Vous n'êtes pas revenu à temps : vous avez perdu le duel par forfait.");
                 player.sendMessage(ChatColor.RED + "Vos affaires ont été lâchées là où vous vous êtes déconnecté.");
@@ -512,16 +427,6 @@ public class DuelFeature implements Listener {
         DuelRequest(UUID requesterUuid, long timestampMillis) {
             this.requesterUuid = requesterUuid;
             this.timestampMillis = timestampMillis;
-        }
-    }
-
-    private static class DisconnectSnapshot {
-        final Location location;
-        final java.util.List<ItemStack> items;
-
-        DisconnectSnapshot(Location location, java.util.List<ItemStack> items) {
-            this.location = location;
-            this.items = items;
         }
     }
 

@@ -1,19 +1,20 @@
 package thomjap.deathban;
 
+import thomjap.deathban.util.YamlFiles;
+
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.io.File;
-import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
 public class AutoMessageFeature {
 
+    private static final String FILE_NAME = "automessage.yml";
+
     private final DeathBan plugin;
-    private File messageFile;
     private FileConfiguration messageConfig;
 
     private BukkitTask task;
@@ -23,7 +24,13 @@ public class AutoMessageFeature {
 
     public AutoMessageFeature(DeathBan plugin) {
         this.plugin = plugin;
-        setupMessageFile();
+        messageConfig = YamlFiles.loadOrCreate(plugin, FILE_NAME, defaults -> {
+            defaults.set("enabled", true);
+            defaults.set("interval-minutes", 5);
+            defaults.set("messages", Arrays.asList(
+                    "&6[Serveur] &fBienvenue sur le serveur !"
+            ));
+        });
         this.enabled = messageConfig.getBoolean("enabled", true);
         this.intervalMinutes = messageConfig.getInt("interval-minutes", 5);
         if (enabled) startTask();
@@ -31,34 +38,10 @@ public class AutoMessageFeature {
 
     // ===================== FICHIER YML =====================
 
-    private void setupMessageFile() {
-        messageFile = new File(plugin.getDataFolder(), "automessage.yml");
-        if (!messageFile.exists()) {
-            plugin.getDataFolder().mkdirs();
-            try {
-                messageFile.createNewFile();
-                FileConfiguration defaults = YamlConfiguration.loadConfiguration(messageFile);
-                defaults.set("enabled", true);
-                defaults.set("interval-minutes", 5);
-                defaults.set("messages", java.util.Arrays.asList(
-                        "&6[Serveur] &fBienvenue sur le serveur !"
-                ));
-                defaults.save(messageFile);
-            } catch (IOException e) {
-                plugin.getLogger().severe("[AutoMessage] Impossible de créer automessage.yml : " + e.getMessage());
-            }
-        }
-        messageConfig = YamlConfiguration.loadConfiguration(messageFile);
-    }
-
     private void save() {
         messageConfig.set("enabled", enabled);
         messageConfig.set("interval-minutes", intervalMinutes);
-        try {
-            messageConfig.save(messageFile);
-        } catch (IOException e) {
-            plugin.getLogger().severe("[AutoMessage] Impossible de sauvegarder automessage.yml : " + e.getMessage());
-        }
+        YamlFiles.save(plugin, messageConfig, FILE_NAME);
     }
 
     // ===================== TASK =====================
@@ -98,7 +81,7 @@ public class AutoMessageFeature {
     // ===================== API =====================
 
     public void reload() {
-        messageConfig = YamlConfiguration.loadConfiguration(messageFile);
+        messageConfig = YamlFiles.loadOrCreate(plugin, FILE_NAME);
         boolean wasEnabled = enabled;
         enabled = messageConfig.getBoolean("enabled", true);
         intervalMinutes = messageConfig.getInt("interval-minutes", 5);
