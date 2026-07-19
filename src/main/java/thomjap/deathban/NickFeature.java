@@ -11,13 +11,13 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class NickFeature implements Listener {
 
-    private final Map<UUID, String> nicks = new HashMap<>();
+    private final Map<UUID, String> nicks = new ConcurrentHashMap<>();
 
     public void setNick(Player player, String nick) {
         String colored = ChatColor.translateAlternateColorCodes('&', nick);

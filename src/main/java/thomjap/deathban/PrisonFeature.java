@@ -1,11 +1,13 @@
 package thomjap.deathban;
 
+import thomjap.deathban.util.PotionEffects;
 import thomjap.deathban.util.YamlFiles;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -43,25 +45,31 @@ public class PrisonFeature implements Listener {
     }
 
     private void loadPrisoners() {
-        if (dataConfig.contains("prisoners")) {
-            for (String key : dataConfig.getConfigurationSection("prisoners").getKeys(false)) {
-                UUID uuid = UUID.fromString(key);
-                String path = "prisoners." + key + ".";
+        if (!dataConfig.contains("prisoners")) return;
 
-                long releaseTimeMillis = dataConfig.getLong(path + "releaseTime");
-                String worldName = dataConfig.getString(path + "world");
-                double x = dataConfig.getDouble(path + "x");
-                double y = dataConfig.getDouble(path + "y");
-                double z = dataConfig.getDouble(path + "z");
-                float yaw = (float) dataConfig.getDouble(path + "yaw");
-                float pitch = (float) dataConfig.getDouble(path + "pitch");
-                boolean clearInventory = dataConfig.getBoolean(path + "clearInventory", false);
-
-                PrisonData data = new PrisonData(releaseTimeMillis, worldName, x, y, z, yaw, pitch, clearInventory);
-                prisoners.put(uuid, data);
-            }
-            plugin.getLogger().info("[Prison] " + prisoners.size() + " prisonnier(s) chargé(s) depuis le fichier.");
+        ConfigurationSection section = dataConfig.getConfigurationSection("prisoners");
+        if (section == null) {
+            plugin.getLogger().warning("[Prison] 'prisoners' existe dans prisoners.yml mais n'est pas une section valide — ignoré.");
+            return;
         }
+
+        for (String key : section.getKeys(false)) {
+            UUID uuid = UUID.fromString(key);
+            String path = "prisoners." + key + ".";
+
+            long releaseTimeMillis = dataConfig.getLong(path + "releaseTime");
+            String worldName = dataConfig.getString(path + "world");
+            double x = dataConfig.getDouble(path + "x");
+            double y = dataConfig.getDouble(path + "y");
+            double z = dataConfig.getDouble(path + "z");
+            float yaw = (float) dataConfig.getDouble(path + "yaw");
+            float pitch = (float) dataConfig.getDouble(path + "pitch");
+            boolean clearInventory = dataConfig.getBoolean(path + "clearInventory", false);
+
+            PrisonData data = new PrisonData(releaseTimeMillis, worldName, x, y, z, yaw, pitch, clearInventory);
+            prisoners.put(uuid, data);
+        }
+        plugin.getLogger().info("[Prison] " + prisoners.size() + " prisonnier(s) chargé(s) depuis le fichier.");
     }
 
     private void savePrisoner(UUID uuid, PrisonData data) {
@@ -195,13 +203,9 @@ public class PrisonFeature implements Listener {
         player.teleport(releaseLocation);
         releasing.remove(uuid);
 
-        player.addPotionEffect(new org.bukkit.potion.PotionEffect(
-                org.bukkit.potion.PotionEffectType.RESISTANCE,
-                configManager.getReleaseProtectionDurationMinutes() * 60 * 20,
-                configManager.getReleaseProtectionAmplifier(),
-                false,
-                true
-        ));
+        PotionEffects.applyTimedResistance(player,
+                configManager.getReleaseProtectionDurationMinutes(),
+                configManager.getReleaseProtectionAmplifier());
 
         player.sendMessage(ChatColor.GREEN + "Vous êtes libéré ! Vous bénéficiez de Résistance "
                 + (configManager.getReleaseProtectionAmplifier() + 1)
@@ -310,8 +314,11 @@ public class PrisonFeature implements Listener {
         if (releasing.contains(uuid)) return; // TP de libération, on laisse passer
         if (event.getTo() == null) return;
 
+        World toWorld = event.getTo().getWorld();
+        if (toWorld == null) return;
+
         String prisonWorldName = configManager.getPrisonWorldName();
-        if (!event.getTo().getWorld().getName().equals(prisonWorldName)) {
+        if (!toWorld.getName().equals(prisonWorldName)) {
             event.setCancelled(true);
         }
     }

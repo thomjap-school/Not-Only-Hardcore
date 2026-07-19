@@ -20,13 +20,11 @@ import java.util.UUID;
 
 public class HeadFeature implements Listener {
 
-    private final DeathBan plugin;
     private final ConfigManager configManager;
     private final DuelFeature duelFeature;
     private final NamespacedKey ownerKey;
 
     public HeadFeature(DeathBan plugin, ConfigManager configManager, DuelFeature duelFeature) {
-        this.plugin = plugin;
         this.configManager = configManager;
         this.duelFeature = duelFeature;
         this.ownerKey = new NamespacedKey(plugin, "head_owner_uuid");
@@ -52,6 +50,9 @@ public class HeadFeature implements Listener {
     private ItemStack createHeadFor(Player owner) {
         ItemStack head = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta meta = (SkullMeta) head.getItemMeta();
+        if (meta == null) {
+            return head;
+        }
 
         meta.setOwningPlayer(owner);
         meta.setDisplayName(ChatColor.RED + "Tête de " + owner.getName());

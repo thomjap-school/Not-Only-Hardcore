@@ -1,5 +1,6 @@
 package thomjap.deathban;
 
+import thomjap.deathban.util.DisconnectGracePeriod;
 import thomjap.deathban.util.InventorySnapshot;
 import thomjap.deathban.util.InventoryUtil;
 import thomjap.deathban.util.PendingUuidSet;
@@ -16,16 +17,12 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
-import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 public class DuelFeature implements Listener {
-
-    private static final long REQUEST_EXPIRY_SECONDS = 60;
-    private static final long DISCONNECT_GRACE_SECONDS = 5 * 60;
 
     private final DeathBan plugin;
     private final ConfigManager configManager;
@@ -37,11 +34,8 @@ public class DuelFeature implements Listener {
     // Duels actifs : joueur -> état du duel (les deux participants pointent vers le même objet)
     private final Map<UUID, ActiveDuel> activeDuels = new HashMap<>();
 
-    // Joueurs déconnectés pendant un duel, en attente de reconnexion
-    private final Map<UUID, BukkitTask> disconnectGraceTasks = new HashMap<>();
-
-    // Snapshot (position + inventaire) capturé à la déconnexion, utilisé en cas de forfait
-    private final Map<UUID, InventorySnapshot> disconnectSnapshots = new HashMap<>();
+    // Orchestration de la période de grâce à la déconnexion pendant un duel (forfait après le délai configuré)
+    private final DisconnectGracePeriod disconnectGracePeriod;
 
     // Joueurs ayant perdu par forfait, à punir (drop déjà fait, emprisonnement) dès leur prochaine connexion.
     // Persisté sur disque pour survivre à un crash/redémarrage du serveur entre le forfait et la reconnexion.
@@ -55,6 +49,7 @@ public class DuelFeature implements Listener {
     public DuelFeature(DeathBan plugin, ConfigManager configManager) {
         this.plugin = plugin;
         this.configManager = configManager;
+        this.disconnectGracePeriod = new DisconnectGracePeriod(plugin, configManager::getCombatDisconnectGraceSeconds);
         this.pendingForfeitPunishment = new PendingUuidSet(plugin, "pending_forfeits.yml");
         if (pendingForfeitPunishment.size() > 0) {
             plugin.getLogger().info("[Duel] " + pendingForfeitPunishment.size()
@@ -87,7 +82,7 @@ public class DuelFeature implements Listener {
             return;
         }
 
-        DuelRequest request = new DuelRequest(requester.getUniqueId(), System.currentTimeMillis());
+        DuelRequest request = new DuelRequest(requester.getUniqueId());
         pendingRequests.put(target.getUniqueId(), request);
 
         requester.sendMessage(ChatColor.YELLOW + "Demande de duel envoyée à " + target.getName() + ".");
@@ -99,7 +94,7 @@ public class DuelFeature implements Listener {
                 " (ou /db duel accept|deny " + requester.getName() + ")"
         );
 
-        // Expiration automatique après 60s
+        // Expiration automatique après le délai configuré
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             DuelRequest current = pendingRequests.get(target.getUniqueId());
             if (current == request) {
@@ -108,7 +103,7 @@ public class DuelFeature implements Listener {
                     requester.sendMessage(ChatColor.RED + "Votre demande de duel envers " + target.getName() + " a expiré.");
                 }
             }
-        }, REQUEST_EXPIRY_SECONDS * 20);
+        }, configManager.getDuelRequestExpirySeconds() * 20L);
     }
 
     public void acceptRequest(Player target, String requesterName) {
@@ -209,12 +204,13 @@ public class DuelFeature implements Listener {
     }
 
     private int pickFreeZone() {
-        boolean[] used = new boolean[4]; // index 1..3
+        int zoneCount = configManager.getDuelZoneCount();
+        boolean[] used = new boolean[zoneCount + 1]; // index 1..zoneCount
         for (ActiveDuel duel : new java.util.HashSet<>(activeDuels.values())) {
-            if (duel.zone >= 1 && duel.zone <= 3) used[duel.zone] = true;
+            if (duel.zone >= 1 && duel.zone <= zoneCount) used[duel.zone] = true;
         }
         java.util.List<Integer> available = new java.util.ArrayList<>();
-        for (int z = 1; z <= 3; z++) {
+        for (int z = 1; z <= zoneCount; z++) {
             if (!used[z]) available.add(z);
         }
         if (available.isEmpty()) return -1;
@@ -294,7 +290,7 @@ public class DuelFeature implements Listener {
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (winner.isOnline()) {
-                clearNearbyItems(winner.getLocation(), 100.0);
+                clearNearbyItems(winner.getLocation(), configManager.getDuelItemCleanupRadiusBlocks());
             }
         }, cleanupDelayTicks);
 
@@ -331,58 +327,45 @@ public class DuelFeature implements Listener {
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
-        ActiveDuel duel = activeDuels.get(player.getUniqueId());
-        if (duel == null) return;
+        if (!activeDuels.containsKey(player.getUniqueId())) return;
 
-        UUID disconnectedUuid = player.getUniqueId();
-
-        scheduleForfeitTask(disconnectedUuid, InventorySnapshot.capture(player));
+        disconnectGracePeriod.start(player, this::handleForfeit);
     }
 
     /**
-     * Programme (ou reprogramme) la tâche de forfait à 5 minutes pour un joueur déconnecté en duel.
-     * Le snapshot fourni sera utilisé pour dropper ses items si le forfait se confirme.
+     * Appelé si le joueur déconnecté en duel ne s'est pas reconnecté avant la fin du délai de grâce : forfait.
      */
-    private void scheduleForfeitTask(UUID disconnectedUuid, InventorySnapshot snapshot) {
-        disconnectSnapshots.put(disconnectedUuid, snapshot);
+    private void handleForfeit(Player player, InventorySnapshot snapshot) {
+        UUID disconnectedUuid = player.getUniqueId();
 
-        BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            // Toujours en duel et toujours hors ligne après le délai -> forfait
-            ActiveDuel stillActive = activeDuels.get(disconnectedUuid);
-            if (stillActive == null) return;
+        // Toujours en duel après le délai -> forfait (peut avoir été retiré entre-temps, ex: adversaire mort autrement)
+        ActiveDuel stillActive = activeDuels.get(disconnectedUuid);
+        if (stillActive == null) return;
 
-            Player stillOffline = Bukkit.getPlayer(disconnectedUuid);
-            if (stillOffline != null && stillOffline.isOnline()) return; // reconnecté entre temps (sécurité, normalement géré par onPlayerJoin)
+        UUID winnerUuid = stillActive.getOpponent(disconnectedUuid);
+        Player winner = Bukkit.getPlayer(winnerUuid);
 
-            UUID winnerUuid = stillActive.getOpponent(disconnectedUuid);
-            Player winner = Bukkit.getPlayer(winnerUuid);
+        activeDuels.remove(disconnectedUuid);
+        activeDuels.remove(winnerUuid);
 
-            activeDuels.remove(disconnectedUuid);
-            activeDuels.remove(winnerUuid);
-            disconnectGraceTasks.remove(disconnectedUuid);
+        // Drop des items du perdant à l'endroit où il s'est déconnecté
+        if (snapshot != null) {
+            snapshot.dropItems();
+        }
+        // Le joueur sera vidé et emprisonné dès sa prochaine connexion (persisté sur disque)
+        pendingForfeitPunishment.add(disconnectedUuid);
 
-            // Drop des items du perdant à l'endroit où il s'est déconnecté
-            InventorySnapshot loserSnapshot = disconnectSnapshots.remove(disconnectedUuid);
-            if (loserSnapshot != null) {
-                loserSnapshot.dropItems();
-            }
-            // Le joueur sera vidé et emprisonné dès sa prochaine connexion (persisté sur disque)
-            pendingForfeitPunishment.add(disconnectedUuid);
+        if (winner != null && winner.isOnline()) {
+            Location returnLocation = stillActive.getReturnLocation(winnerUuid);
+            int delaySeconds = configManager.getDuelReturnDelaySeconds();
 
-            if (winner != null && winner.isOnline()) {
-                Location returnLocation = stillActive.getReturnLocation(winnerUuid);
-                int delaySeconds = configManager.getDuelReturnDelaySeconds();
+            winner.sendMessage(ChatColor.GREEN + "Votre adversaire ne s'est pas reconnecté à temps. Vous gagnez le duel !");
+            winner.sendMessage(ChatColor.GREEN + "Retour dans " + delaySeconds + "s.");
 
-                winner.sendMessage(ChatColor.GREEN + "Votre adversaire ne s'est pas reconnecté à temps. Vous gagnez le duel !");
-                winner.sendMessage(ChatColor.GREEN + "Retour dans " + delaySeconds + "s.");
+            scheduleWinnerReturn(winner, returnLocation, delaySeconds);
+        }
 
-                scheduleWinnerReturn(winner, returnLocation, delaySeconds);
-            }
-
-            plugin.getLogger().info("[Duel] " + disconnectedUuid + " ne s'est pas reconnecté à temps, duel perdu par forfait. Items droppés, emprisonnement prévu à la reconnexion.");
-        }, DISCONNECT_GRACE_SECONDS * 20L);
-
-        disconnectGraceTasks.put(disconnectedUuid, task);
+        plugin.getLogger().info("[Duel] " + disconnectedUuid + " ne s'est pas reconnecté à temps, duel perdu par forfait. Items droppés, emprisonnement prévu à la reconnexion.");
     }
 
     @EventHandler
@@ -407,10 +390,7 @@ public class DuelFeature implements Listener {
         }
 
         // Cas 2 : le joueur revient à temps, avant l'expiration du délai de grâce
-        BukkitTask task = disconnectGraceTasks.remove(uuid);
-        if (task != null) {
-            task.cancel();
-            disconnectSnapshots.remove(uuid);
+        if (disconnectGracePeriod.cancelIfPending(uuid)) {
             ActiveDuel duel = activeDuels.get(uuid);
             if (duel != null) {
                 player.sendMessage(ChatColor.YELLOW + "Vous vous êtes reconnecté à temps, le duel continue !");
@@ -422,11 +402,9 @@ public class DuelFeature implements Listener {
 
     private static class DuelRequest {
         final UUID requesterUuid;
-        final long timestampMillis;
 
-        DuelRequest(UUID requesterUuid, long timestampMillis) {
+        DuelRequest(UUID requesterUuid) {
             this.requesterUuid = requesterUuid;
-            this.timestampMillis = timestampMillis;
         }
     }
 

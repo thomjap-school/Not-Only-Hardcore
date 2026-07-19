@@ -16,20 +16,14 @@ import java.util.stream.Collectors;
 
 public class AlexBanniereFeature implements Listener {
 
-    // ==========================================================
-    // === CONFIGURATION ===
-    // ==========================================================
-
-    private static final String TARGET_PLAYER = "AlexJanOne";
-
-    // ==========================================================
-
     private final DeathBan plugin;
+    private final ConfigManager configManager;
     private boolean enabled;
 
-    public AlexBanniereFeature(DeathBan plugin, boolean enabled) {
+    public AlexBanniereFeature(DeathBan plugin, ConfigManager configManager) {
         this.plugin = plugin;
-        this.enabled = enabled;
+        this.configManager = configManager;
+        this.enabled = configManager.isAlexBanniereEnabled();
     }
 
     public boolean isEnabled() {
@@ -38,6 +32,11 @@ public class AlexBanniereFeature implements Listener {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+        configManager.setAlexBanniereEnabled(enabled);
+    }
+
+    public String getTargetPlayerName() {
+        return configManager.getAlexBanniereTargetPlayer();
     }
 
     // Tous les types de bannières du jeu
@@ -50,7 +49,7 @@ public class AlexBanniereFeature implements Listener {
     }
 
     private boolean isTarget(Player player) {
-        return player.getName().equalsIgnoreCase(TARGET_PLAYER);
+        return player.getName().equalsIgnoreCase(getTargetPlayerName());
     }
 
     /**

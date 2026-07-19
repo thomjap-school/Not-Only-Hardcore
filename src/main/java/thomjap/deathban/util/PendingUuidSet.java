@@ -34,8 +34,8 @@ public class PendingUuidSet {
         for (String s : config.getStringList("pending")) {
             try {
                 values.add(UUID.fromString(s));
-            } catch (IllegalArgumentException ignored) {
-                // entrée corrompue, on l'ignore
+            } catch (IllegalArgumentException e) {
+                plugin.getLogger().warning("[PendingUuidSet] Entrée UUID corrompue dans " + fileName + ", ignorée : " + s);
             }
         }
     }

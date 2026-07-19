@@ -25,6 +25,9 @@ new-player-protection:
 duel:
   world: duel
   return-delay-seconds: 30
+  request-expiry-seconds: 60
+  zone-count: 3
+  item-cleanup-radius-blocks: 100.0
   zones:
     1:
       a: {x: 0.0, y: 100.0, z: 0.0, yaw: 0.0, pitch: 0.0}
@@ -35,3 +38,11 @@ duel:
     3:
       a: {x: 0.0, y: 100.0, z: 100.0, yaw: 0.0, pitch: 0.0}
       b: {x: 10.0, y: 100.0, z: 100.0, yaw: 180.0, pitch: 0.0}
+
+combat:
+  disconnect-grace-seconds: 300
+  tag-seconds: 20
+
+alexbanniere:
+  enabled: true
+  target-player: AlexJanOne

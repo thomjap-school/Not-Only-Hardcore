@@ -4,6 +4,7 @@ import thomjap.deathban.util.YamlFiles;
 
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -55,7 +56,8 @@ public class KitFeature {
             return;
         }
 
-        if (!kitConfig.contains("items")) {
+        ConfigurationSection itemsSection = kitConfig.getConfigurationSection("items");
+        if (itemsSection == null) {
             player.sendMessage(ChatColor.RED + "Aucun item configuré dans kit.yml.");
             return;
         }
@@ -63,7 +65,7 @@ public class KitFeature {
         kitClaimed.add(player.getUniqueId());
 
         int count = 0;
-        for (String key : kitConfig.getConfigurationSection("items").getKeys(false)) {
+        for (String key : itemsSection.getKeys(false)) {
             String path = "items." + key + ".";
             String materialName = kitConfig.getString(path + "material", "AIR").toUpperCase();
             int amount = kitConfig.getInt(path + "amount", 1);

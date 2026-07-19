@@ -48,7 +48,11 @@ public class ConfigManager {
 
         config.addDefault("duel.world", "duel");
         config.addDefault("duel.return-delay-seconds", 30);
-        for (int zone = 1; zone <= 3; zone++) {
+        config.addDefault("duel.request-expiry-seconds", 60);
+        config.addDefault("duel.zone-count", 3);
+        config.addDefault("duel.item-cleanup-radius-blocks", 100.0);
+        int zoneCount = config.getInt("duel.zone-count", 3);
+        for (int zone = 1; zone <= zoneCount; zone++) {
             for (String slot : new String[]{"a", "b"}) {
                 String base = "duel.zones." + zone + "." + slot + ".";
                 config.addDefault(base + "x", 0.0);
@@ -58,6 +62,12 @@ public class ConfigManager {
                 config.addDefault(base + "pitch", 0.0);
             }
         }
+
+        config.addDefault("combat.disconnect-grace-seconds", 5 * 60);
+        config.addDefault("combat.tag-seconds", 20);
+
+        config.addDefault("alexbanniere.enabled", true);
+        config.addDefault("alexbanniere.target-player", "AlexJanOne");
 
         config.options().copyDefaults(true);
         plugin.saveConfig();
@@ -153,10 +163,6 @@ public class ConfigManager {
         String name = config.getString("head.effect", "POISON");
         PotionEffectType type = PotionEffectType.getByName(name);
         return type != null ? type : PotionEffectType.POISON;
-    }
-
-    public String getHeadEffectName() {
-        return config.getString("head.effect", "POISON");
     }
 
     public void setHeadEffect(String effectName) {
@@ -273,8 +279,30 @@ public class ConfigManager {
         save();
     }
 
-    public static boolean isValidZone(int zone) {
-        return zone >= 1 && zone <= 3;
+    public int getDuelRequestExpirySeconds() {
+        return config.getInt("duel.request-expiry-seconds", 60);
+    }
+
+    public void setDuelRequestExpirySeconds(int seconds) {
+        config.set("duel.request-expiry-seconds", seconds);
+        save();
+    }
+
+    public int getDuelZoneCount() {
+        return config.getInt("duel.zone-count", 3);
+    }
+
+    public double getDuelItemCleanupRadiusBlocks() {
+        return config.getDouble("duel.item-cleanup-radius-blocks", 100.0);
+    }
+
+    public void setDuelItemCleanupRadiusBlocks(double radiusBlocks) {
+        config.set("duel.item-cleanup-radius-blocks", radiusBlocks);
+        save();
+    }
+
+    public boolean isValidZone(int zone) {
+        return zone >= 1 && zone <= getDuelZoneCount();
     }
 
     public static boolean isValidSlot(String slot) {
@@ -307,6 +335,46 @@ public class ConfigManager {
 
     public void setDuelCoordinate(int zone, String slot, String axis, double value) {
         config.set(duelBase(zone, slot) + axis.toLowerCase(), value);
+        save();
+    }
+
+    // ===================== COMBAT =====================
+
+    public long getCombatDisconnectGraceSeconds() {
+        return config.getLong("combat.disconnect-grace-seconds", 5 * 60);
+    }
+
+    public void setCombatDisconnectGraceSeconds(long seconds) {
+        config.set("combat.disconnect-grace-seconds", seconds);
+        save();
+    }
+
+    public int getCombatTagSeconds() {
+        return config.getInt("combat.tag-seconds", 20);
+    }
+
+    public void setCombatTagSeconds(int seconds) {
+        config.set("combat.tag-seconds", seconds);
+        save();
+    }
+
+    // ===================== ALEXBANNIERE =====================
+
+    public boolean isAlexBanniereEnabled() {
+        return config.getBoolean("alexbanniere.enabled", true);
+    }
+
+    public void setAlexBanniereEnabled(boolean enabled) {
+        config.set("alexbanniere.enabled", enabled);
+        save();
+    }
+
+    public String getAlexBanniereTargetPlayer() {
+        return config.getString("alexbanniere.target-player", "AlexJanOne");
+    }
+
+    public void setAlexBanniereTargetPlayer(String name) {
+        config.set("alexbanniere.target-player", name);
         save();
     }
 }
